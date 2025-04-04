@@ -1,0 +1,8 @@
+relationship 66324b84-8717-9c85-7709-9ecbb484ff7a
+	fromColumn: CrimeIncidents.START_DATE
+	toColumn: dimDate.Date
+
+relationship d1346072-b515-ba99-f944-528d2a154904
+	fromColumn: CrimeIncidents.NEAREST_15M_START_TIME
+	toColumn: dimTime.Time
+

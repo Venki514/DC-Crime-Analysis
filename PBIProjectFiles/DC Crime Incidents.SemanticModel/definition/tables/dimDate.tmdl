@@ -145,7 +145,7 @@ table dimDate
 		dataType: int64
 		formatString: 0
 		lineageTag: 05a0a8b5-925a-403a-a36a-7c3769be7753
-		summarizeBy: count
+		summarizeBy: none
 		sourceColumn: DateKey
 
 		annotation SummarizationSetBy = Automatic
@@ -155,8 +155,8 @@ table dimDate
 		source = ```
 				let
 				    // Get min/max dates from existing crime data
-				    StartDate = DateTime.Date(List.Min(CrimeIncidents[REPORT_DATE])),
-				    EndDate = DateTime.Date(List.Max(CrimeIncidents[END_DATETIME])),
+				    StartDate = DateTime.Date(List.Min(CrimeIncidents[START_DATE])),
+				    EndDate = DateTime.Date(List.Max(CrimeIncidents[START_DATE])),
 				
 				    // Create continuous date sequence
 				    DateList = List.Dates(StartDate, Duration.Days(EndDate - StartDate) + 1, #duration(1,0,0,0)),
