@@ -1,0 +1,209 @@
+table CrimeIncidents
+	lineageTag: 547917d3-3be2-4a34-9861-c9674d856ef5
+
+	column CCN
+		dataType: int64
+		formatString: 0
+		lineageTag: 4671c309-49fe-464a-b4e3-740dcd30a0f3
+		summarizeBy: sum
+		sourceColumn: CCN
+
+		annotation SummarizationSetBy = Automatic
+
+	column SHIFT
+		dataType: string
+		lineageTag: 765f4121-1831-4b9f-8369-0d91258b7a34
+		summarizeBy: none
+		sourceColumn: SHIFT
+
+		annotation SummarizationSetBy = Automatic
+
+	column METHOD
+		dataType: string
+		lineageTag: 39e379f2-7b90-41ad-87ef-0595e2a8efba
+		summarizeBy: none
+		sourceColumn: METHOD
+
+		annotation SummarizationSetBy = Automatic
+
+	column OFFENSE
+		dataType: string
+		lineageTag: 10a5cd49-f18f-4bde-abd1-17ff98a477d5
+		summarizeBy: none
+		sourceColumn: OFFENSE
+
+		annotation SummarizationSetBy = Automatic
+
+	column BLOCK
+		dataType: string
+		lineageTag: b2648cf8-aaf1-47c0-a43d-5847a38b47ad
+		summarizeBy: none
+		sourceColumn: BLOCK
+
+		annotation SummarizationSetBy = Automatic
+
+	column XBLOCK
+		dataType: double
+		lineageTag: 429d3123-1502-453f-9e8c-977f2e3c76db
+		summarizeBy: sum
+		sourceColumn: XBLOCK
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column YBLOCK
+		dataType: double
+		lineageTag: f056167d-d47b-4f15-8ab5-c4241cc4638a
+		summarizeBy: sum
+		sourceColumn: YBLOCK
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column WARD
+		dataType: int64
+		formatString: 0
+		lineageTag: 1657141a-2a7a-4a8d-93fe-4369cf30e8c3
+		summarizeBy: sum
+		sourceColumn: WARD
+
+		annotation SummarizationSetBy = Automatic
+
+	column ANC
+		dataType: string
+		lineageTag: 40cd922c-4863-486e-9c06-845c2c6e58a9
+		summarizeBy: none
+		sourceColumn: ANC
+
+		annotation SummarizationSetBy = Automatic
+
+	column DISTRICT
+		dataType: int64
+		formatString: 0
+		lineageTag: 5336a378-ef9a-448d-a6bb-558649475c3f
+		summarizeBy: sum
+		sourceColumn: DISTRICT
+
+		annotation SummarizationSetBy = Automatic
+
+	column PSA
+		dataType: int64
+		formatString: 0
+		lineageTag: 7a5df3ed-7f7c-40d1-96e1-772d69f37770
+		summarizeBy: sum
+		sourceColumn: PSA
+
+		annotation SummarizationSetBy = Automatic
+
+	column NEIGHBORHOOD_CLUSTER
+		dataType: string
+		lineageTag: 6f1cda5c-3b03-4a31-892f-6fd3fdc5ed9c
+		summarizeBy: none
+		sourceColumn: NEIGHBORHOOD_CLUSTER
+
+		annotation SummarizationSetBy = Automatic
+
+	column BLOCK_GROUP
+		dataType: string
+		lineageTag: a6738faa-ef75-40d5-912c-7068620dccf2
+		summarizeBy: none
+		sourceColumn: BLOCK_GROUP
+
+		annotation SummarizationSetBy = Automatic
+
+	column CENSUS_TRACT
+		dataType: string
+		lineageTag: cb50193b-4e5d-4eef-b819-0cde6aee8659
+		summarizeBy: none
+		sourceColumn: CENSUS_TRACT
+
+		annotation SummarizationSetBy = Automatic
+
+	column VOTING_PRECINCT
+		dataType: string
+		lineageTag: 8535aef0-d1c8-44cf-a8fa-17370bd63c31
+		summarizeBy: none
+		sourceColumn: VOTING_PRECINCT
+
+		annotation SummarizationSetBy = Automatic
+
+	column LATITUDE
+		dataType: double
+		lineageTag: db6bc25f-ea59-4ca3-8769-a3a1f41e089a
+		dataCategory: Latitude
+		summarizeBy: sum
+		sourceColumn: LATITUDE
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column LONGITUDE
+		dataType: double
+		lineageTag: 0f783a2a-84ba-405e-9179-98f51bbe9b68
+		dataCategory: Longitude
+		summarizeBy: sum
+		sourceColumn: LONGITUDE
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column BID
+		dataType: string
+		lineageTag: 1f0e8454-7bf4-46bd-93ba-b49b5d984cb0
+		summarizeBy: none
+		sourceColumn: BID
+
+		annotation SummarizationSetBy = Automatic
+
+	column OBJECTID
+		dataType: int64
+		formatString: 0
+		lineageTag: 342410b1-382a-4adc-9885-efa20671eddc
+		summarizeBy: count
+		sourceColumn: OBJECTID
+
+		annotation SummarizationSetBy = Automatic
+
+	column REPORT_DATE
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 5319124d-8d90-4e9e-bc5f-a9f5a94673db
+		summarizeBy: none
+		sourceColumn: REPORT_DATE
+
+		annotation SummarizationSetBy = Automatic
+
+	column START_DATETIME
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: bcaea7c9-88dd-4994-8868-890a0ceae7e1
+		summarizeBy: none
+		sourceColumn: START_DATETIME
+
+		annotation SummarizationSetBy = Automatic
+
+	column END_DATETIME
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: bd31db70-b768-4934-b3c9-572c19d68e46
+		summarizeBy: none
+		sourceColumn: END_DATETIME
+
+		annotation SummarizationSetBy = Automatic
+
+	partition CrimeIncidents = m
+		mode: import
+		source =
+				let
+				    Source = Table.Combine({CrimeIncidents_2023, CrimeIncidents_2024, CrimeIncidents_2025})
+				in
+				    Source
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

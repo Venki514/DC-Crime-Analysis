@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "DC Crime Incidents"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "4f2a6f2a-e4d0-4c9d-a11d-5d7a42137ab7"
+  }
+}

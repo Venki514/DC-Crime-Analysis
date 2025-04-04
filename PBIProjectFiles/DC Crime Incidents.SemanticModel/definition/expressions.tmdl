@@ -1,0 +1,66 @@
+expression CrimeIncidents_2023 =
+		let
+		    Source = Json.Document(Web.Contents("https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/5/query?outFields=*&where=1%3D1&f=geojson")),
+		    ExtractFeatures = Source[features],
+		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}),
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
+		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}),
+		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
+		    ConvertReportDateToDateTime = Table.AddColumn(SetColumnDataTypes, "REPORT_DATE", each if [REPORT_DAT] = null then null else DateTimeZone.From( #datetime(1970,1,1,0,0,0) + #duration(0,0,0,[REPORT_DAT] / 1000) )),
+		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else DateTimeZone.From( #datetime(1970,1,1,0,0,0) + #duration(0,0,0,[START_DATE] / 1000) )),
+		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else DateTimeZone.From( #datetime(1970,1,1,0,0,0) + #duration(0,0,0,[END_DATE] / 1000) )),
+		    SetDateTimeColumnTypes = Table.TransformColumnTypes(ConvertEndDateToDateTime,{{"REPORT_DATE", type datetimezone}, {"START_DATETIME", type datetimezone}, {"END_DATETIME", type datetimezone}}),
+		    RemoveOriginalDateColumns = Table.RemoveColumns(SetDateTimeColumnTypes,{"OCTO_RECORD_ID", "START_DATE", "END_DATE", "REPORT_DAT"})
+		in
+		    RemoveOriginalDateColumns
+	lineageTag: f84facab-6546-4202-bfd3-9b75b92dc555
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+
+expression CrimeIncidents_2024 =
+		let
+		    Source = Json.Document(Web.Contents("https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/6/query?outFields=*&where=1%3D1&f=geojson")),
+		    ExtractFeatures = Source[features],
+		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}),
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
+		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}),
+		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
+		    ConvertReportDateToDateTime = Table.AddColumn(SetColumnDataTypes, "REPORT_DATE", each if [REPORT_DAT] = null then null else DateTimeZone.From( #datetime(1970,1,1,0,0,0) + #duration(0,0,0,[REPORT_DAT] / 1000) )),
+		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else DateTimeZone.From( #datetime(1970,1,1,0,0,0) + #duration(0,0,0,[START_DATE] / 1000) )),
+		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else DateTimeZone.From( #datetime(1970,1,1,0,0,0) + #duration(0,0,0,[END_DATE] / 1000) )),
+		    SetDateTimeColumnTypes = Table.TransformColumnTypes(ConvertEndDateToDateTime,{{"REPORT_DATE", type datetimezone}, {"START_DATETIME", type datetimezone}, {"END_DATETIME", type datetimezone}}),
+		    RemoveOriginalDateColumns = Table.RemoveColumns(SetDateTimeColumnTypes,{"OCTO_RECORD_ID", "START_DATE", "END_DATE", "REPORT_DAT"})
+		in
+		    RemoveOriginalDateColumns
+	lineageTag: 383318f6-33e4-4f3b-9023-5e5a7aa82fc1
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+
+expression CrimeIncidents_2025 =
+		let
+		    Source = Json.Document(Web.Contents("https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/7/query?outFields=*&where=1%3D1&f=geojson")),
+		    ExtractFeatures = Source[features],
+		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}),
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
+		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}),
+		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
+		    ConvertReportDateToDateTime = Table.AddColumn(SetColumnDataTypes, "REPORT_DATE", each if [REPORT_DAT] = null then null else DateTimeZone.From( #datetime(1970,1,1,0,0,0) + #duration(0,0,0,[REPORT_DAT] / 1000) )),
+		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else DateTimeZone.From( #datetime(1970,1,1,0,0,0) + #duration(0,0,0,[START_DATE] / 1000) )),
+		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else DateTimeZone.From( #datetime(1970,1,1,0,0,0) + #duration(0,0,0,[END_DATE] / 1000) )),
+		    SetDateTimeColumnTypes = Table.TransformColumnTypes(ConvertEndDateToDateTime,{{"REPORT_DATE", type datetimezone}, {"START_DATETIME", type datetimezone}, {"END_DATETIME", type datetimezone}}),
+		    RemoveOriginalDateColumns = Table.RemoveColumns(SetDateTimeColumnTypes,{"OCTO_RECORD_ID", "START_DATE", "END_DATE", "REPORT_DAT"})
+		in
+		    RemoveOriginalDateColumns
+	lineageTag: 108eed28-cc48-46b2-8483-986eb5535e87
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

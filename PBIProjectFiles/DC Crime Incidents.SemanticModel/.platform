@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "DC Crime Incidents"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "fc4ff380-2fd6-427d-a8a5-4d12701e7c18"
+  }
+}

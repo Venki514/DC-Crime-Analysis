@@ -1,0 +1,199 @@
+table dimDate
+	lineageTag: 410c4d27-b429-4d5a-8b9b-1211d9564cd6
+
+	column Date
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 4c24d7ec-2d67-44c9-a933-44523855ad4a
+		summarizeBy: none
+		sourceColumn: Date
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column Year
+		dataType: int64
+		formatString: 0
+		lineageTag: 55e4b93b-910f-4eeb-a319-4d3dfa547139
+		summarizeBy: sum
+		sourceColumn: Year
+
+		annotation SummarizationSetBy = Automatic
+
+	column Quarter
+		dataType: string
+		lineageTag: 72b5e6ef-f8fb-4dd2-804d-70ad962a339e
+		summarizeBy: none
+		sourceColumn: Quarter
+
+		annotation SummarizationSetBy = Automatic
+
+	column Month
+		dataType: int64
+		formatString: 0
+		lineageTag: fca1b5d0-abaa-48e7-b9a3-a9e82f51f931
+		summarizeBy: sum
+		sourceColumn: Month
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Month Name'
+		dataType: string
+		lineageTag: 13e41522-9371-407d-8670-0b64c3ecb324
+		summarizeBy: none
+		sourceColumn: Month Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Day
+		dataType: int64
+		formatString: 0
+		lineageTag: 14fd8373-443c-4215-a0a2-cb91dccecaf4
+		summarizeBy: sum
+		sourceColumn: Day
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Day of Week'
+		dataType: int64
+		formatString: 0
+		lineageTag: 21b8956a-734d-41bd-aa28-82b0c8ceb0ee
+		summarizeBy: sum
+		sourceColumn: Day of Week
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Day Name'
+		dataType: string
+		lineageTag: 440166ef-b9aa-47e9-95f6-2bf34ffee81f
+		summarizeBy: none
+		sourceColumn: Day Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Week of Year'
+		dataType: int64
+		formatString: 0
+		lineageTag: b0e52330-d050-4722-8e40-5486b8f49007
+		summarizeBy: sum
+		sourceColumn: Week of Year
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'ISO Week Number'
+		dataType: int64
+		formatString: 0
+		lineageTag: d5777492-dfcd-47b2-a0c6-e4e65624d71f
+		summarizeBy: sum
+		sourceColumn: ISO Week Number
+
+		annotation SummarizationSetBy = Automatic
+
+	column Year-Quarter
+		dataType: string
+		lineageTag: 2432ca58-a47a-4c6a-83ea-100a5bf9be8d
+		summarizeBy: none
+		sourceColumn: Year-Quarter
+
+		annotation SummarizationSetBy = Automatic
+
+	column Year-Month
+		dataType: string
+		lineageTag: 6768f39e-fd94-4b54-9676-8260bdb0ac93
+		summarizeBy: none
+		sourceColumn: Year-Month
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Fiscal Year'
+		dataType: int64
+		formatString: 0
+		lineageTag: ab66b518-500b-465d-9ed2-a5c6b06d056e
+		summarizeBy: sum
+		sourceColumn: Fiscal Year
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Fiscal Quarter'
+		dataType: string
+		lineageTag: 7a5cbff2-1fc9-4dbd-ba89-389e2ca887ed
+		summarizeBy: none
+		sourceColumn: Fiscal Quarter
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Is Weekend'
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: d488d5ff-c330-4f02-854e-71dcd70ab40f
+		summarizeBy: none
+		sourceColumn: Is Weekend
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Days in Month'
+		dataType: int64
+		formatString: 0
+		lineageTag: bf60683b-d27c-4325-b8e7-293a49dee67e
+		summarizeBy: sum
+		sourceColumn: Days in Month
+
+		annotation SummarizationSetBy = Automatic
+
+	column DateKey
+		dataType: int64
+		formatString: 0
+		lineageTag: 05a0a8b5-925a-403a-a36a-7c3769be7753
+		summarizeBy: count
+		sourceColumn: DateKey
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dimDate = m
+		mode: import
+		source = ```
+				let
+				    // Get min/max dates from existing crime data
+				    StartDate = DateTime.Date(List.Min(CrimeIncidents[REPORT_DATE])),
+				    EndDate = DateTime.Date(List.Max(CrimeIncidents[END_DATETIME])),
+				
+				    // Create continuous date sequence
+				    DateList = List.Dates(StartDate, Duration.Days(EndDate - StartDate) + 1, #duration(1,0,0,0)),
+				    
+				    // Convert to table
+				    DateTable = Table.FromList(DateList, Splitter.SplitByNothing(), {"Date"}),
+				
+				    // Add date components
+				    #"Added Year" = Table.AddColumn(DateTable, "Year", each Date.Year([Date]), Int64.Type),
+				    #"Added Quarter" = Table.AddColumn(#"Added Year", "Quarter", each "Q" & Text.From(Date.QuarterOfYear([Date])), type text),
+				    #"Added Month" = Table.AddColumn(#"Added Quarter", "Month", each Date.Month([Date]), Int64.Type),
+				    #"Added Month Name" = Table.AddColumn(#"Added Month", "Month Name", each Date.ToText([Date], "MMMM"), type text),
+				    #"Added Day" = Table.AddColumn(#"Added Month Name", "Day", each Date.Day([Date]), Int64.Type),
+				    #"Added Day of Week" = Table.AddColumn(#"Added Day", "Day of Week", each Date.DayOfWeek([Date], Day.Monday) + 1, Int64.Type),
+				    #"Added Day Name" = Table.AddColumn(#"Added Day of Week", "Day Name", each Date.ToText([Date], "dddd"), type text),
+				    #"Added Week of Year" = Table.AddColumn(#"Added Day Name", "Week of Year", each Date.WeekOfYear([Date]), Int64.Type),
+				    #"Added ISO Week Number" = Table.AddColumn(#"Added Week of Year", "ISO Week Number", each Date.WeekOfYear([Date], Day.Monday), Int64.Type),
+				    #"Added Year Quarter" = Table.AddColumn(#"Added ISO Week Number", "Year-Quarter", each Text.From(Date.Year([Date])) & "-Q" & Text.From(Date.QuarterOfYear([Date])), type text),
+				    #"Added Year Month" = Table.AddColumn(#"Added Year Quarter", "Year-Month", each Text.From(Date.Year([Date])) & "-" & Text.PadStart(Text.From(Date.Month([Date])),2, "0"), type text),
+				    #"Added Fiscal Year" = Table.AddColumn(#"Added Year Month", "Fiscal Year", each if Date.Month([Date]) >= 7 then Date.Year([Date]) + 1 else Date.Year([Date]), Int64.Type),
+				    #"Added Fiscal Quarter" = Table.AddColumn(#"Added Fiscal Year", "Fiscal Quarter", each "Q" & Text.From(if Date.QuarterOfYear([Date]) >= 3 then Date.QuarterOfYear([Date]) - 2 else Date.QuarterOfYear([Date]) + 2), type text),
+				    #"Added Is Weekend" = Table.AddColumn(#"Added Fiscal Quarter", "Is Weekend", each Date.DayOfWeek([Date]) = Day.Saturday or Date.DayOfWeek([Date]) = Day.Sunday, type logical),
+				    #"Added Days in Month" = Table.AddColumn(#"Added Is Weekend", "Days in Month", each Date.DaysInMonth([Date]), Int64.Type),
+				    #"Added DateKey" = Table.AddColumn(#"Added Days in Month", "DateKey", each Date.Year([Date]) * 10000 + Date.Month([Date]) * 100 + Date.Day([Date]), Int64.Type),
+				    // Change data types
+				    #"Changed Types" = Table.TransformColumnTypes(#"Added DateKey", {
+				        {"Date", type date}, {"Year", Int64.Type}, {"Quarter", type text}, {"Month", Int64.Type}, 
+				        {"Month Name", type text}, {"Day", Int64.Type}, {"Day of Week", Int64.Type}, {"Day Name", type text}, 
+				        {"Week of Year", Int64.Type}, {"ISO Week Number", Int64.Type}, {"Year-Quarter", type text}, 
+				        {"Year-Month", type text}, {"Fiscal Year", Int64.Type}, {"Fiscal Quarter", type text}, 
+				        {"Is Weekend", type logical}, {"Days in Month", Int64.Type}, {"DateKey", Int64.Type}
+				    })
+				in
+				    #"Changed Types"
+				```
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

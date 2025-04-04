@@ -1,0 +1,87 @@
+table dimTime
+	lineageTag: 1e98c5b4-a385-4f33-be4d-142dfa7c5cb1
+
+	column Time
+		dataType: dateTime
+		formatString: Long Time
+		lineageTag: a011145f-c132-4b92-be8f-78c247f97f98
+		summarizeBy: none
+		sourceColumn: Time
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Time
+
+	column Hour
+		dataType: int64
+		formatString: 0
+		lineageTag: c2c9a363-e92b-421b-b8ec-a19f56aff59b
+		summarizeBy: sum
+		sourceColumn: Hour
+
+		annotation SummarizationSetBy = Automatic
+
+	column Minute
+		dataType: int64
+		formatString: 0
+		lineageTag: 0eb82146-1455-456c-912a-b5e7a4e26531
+		summarizeBy: sum
+		sourceColumn: Minute
+
+		annotation SummarizationSetBy = Automatic
+
+	column '12H Format'
+		dataType: string
+		lineageTag: 42357330-aadf-4a70-a242-feeefeaf1d3c
+		summarizeBy: none
+		sourceColumn: 12H Format
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Hour Bin'
+		dataType: string
+		lineageTag: c3b99b93-6e2c-4d37-8d01-4650b924627b
+		summarizeBy: none
+		sourceColumn: Hour Bin
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Time Category'
+		dataType: string
+		lineageTag: 32b9370c-8d7b-4b2a-ad7d-b49a47c731fc
+		summarizeBy: none
+		sourceColumn: Time Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column TimeKey
+		dataType: int64
+		formatString: 0
+		lineageTag: 15b58c4d-4502-4c08-ad79-d21d3d8a09ea
+		summarizeBy: count
+		sourceColumn: TimeKey
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dimTime = m
+		mode: import
+		source =
+				let
+				    TimeList = List.Generate(() => 0, each _ < 1440, each _ + 15),
+				    TimeTable = Table.FromList(TimeList, Splitter.SplitByNothing(), {"MinuteOfDay"}, null, ExtraValues.Error),
+				    #"Added Time" = Table.AddColumn(TimeTable, "Time", each #time(0,0,0) + #duration(0,0,[MinuteOfDay],0)),
+				    #"Added Hour" = Table.AddColumn(#"Added Time", "Hour", each Time.Hour([Time]), Int64.Type),
+				    #"Added Minute" = Table.AddColumn(#"Added Hour", "Minute", each Time.Minute([Time]), Int64.Type),
+				    #"Added 12H Format" = Table.AddColumn(#"Added Minute", "12H Format", each Time.ToText([Time], "h:mm tt")),
+				    #"Added Hour Bin" = Table.AddColumn(#"Added 12H Format", "Hour Bin", each Text.From([Hour]) & ":00-" & Text.From([Hour]) & ":59"),
+				    #"Added Time Category" = Table.AddColumn(#"Added Hour Bin", "Time Category", each if [Hour] >= 5 and [Hour] < 12 then "Morning (5a-12p)" else if [Hour] >= 12 and [Hour] < 17 then "Afternoon (12p-5p)" else if [Hour] >= 17 and [Hour] < 21 then "Evening (5p-9p)" else "Night (9p-5a)"),
+				    #"Added TimeKey" = Table.AddColumn(#"Added Time Category" , "TimeKey", each [Hour] * 100 + [Minute]),
+				    #"Removed Columns" = Table.RemoveColumns(#"Added TimeKey",{"MinuteOfDay"}),
+				    #"Changed Types" = Table.TransformColumnTypes(#"Removed Columns",{{"Time", type time},{"Hour", Int64.Type},{"Minute", Int64.Type},{"12H Format", type text},{"Hour Bin", type text},{"Time Category", type text},{"TimeKey", Int64.Type}})
+				in
+				    #"Changed Types"
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

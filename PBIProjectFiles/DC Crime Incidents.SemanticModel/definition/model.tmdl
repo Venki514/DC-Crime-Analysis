@@ -1,0 +1,23 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-IN
+	dataAccessOptions
+		fastCombine
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBIDesktopVersion = 2.141.1253.0 (25.03)+74f9999a1e95f78c739f3ea2b96ba340e9ba8729
+
+annotation PBI_QueryOrder = ["CrimeIncidents_2023","CrimeIncidents_2024","CrimeIncidents_2025","CrimeIncidents","dimDate","dimTime"]
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table dimDate
+ref table CrimeIncidents
+ref table dimTime
+
+ref cultureInfo en-US
+
