@@ -1,6 +1,62 @@
 table CrimeIncidents
 	lineageTag: 547917d3-3be2-4a34-9861-c9674d856ef5
 
+	measure 'Total Incidents' = COUNTROWS('CrimeIncidents')
+		formatString: #,0
+		displayFolder: KPIs
+		lineageTag: 61481093-104a-4d1c-ab94-87bfbe409a27
+
+	measure 'Avg Crimes per Day' = DIVIDE([Total Incidents], DISTINCTCOUNT('dimDate'[Date]))
+		displayFolder: KPIs
+		lineageTag: 06f177dd-5e8c-478f-8bda-7623081f7caa
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Crimes Today' = CALCULATE([Total Incidents], CrimeIncidents[START_DATE] = TODAY())
+		formatString: 0
+		displayFolder: KPIs
+		lineageTag: 8561c033-b4f3-4bf8-a2d2-a6a71853f4d0
+
+	measure '7D Avg Crimes' = AVERAGEX(DATESINPERIOD('dimDate'[Date], MAX('dimDate'[Date]), -7, DAY), [Total Incidents])
+		displayFolder: KPIs
+		lineageTag: afcdef2d-b4fb-4d5a-aca8-e33a75bd9f33
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure '% Change vs Last Month' = ```
+			
+			VAR Crimes_Last_Month = 
+			    CALCULATE([Total Incidents], PARALLELPERIOD('dimDate'[Date], -1, MONTH))
+			RETURN
+			    DIVIDE([Total Incidents] - Crimes_Last_Month, Crimes_Last_Month)
+			```
+		displayFolder: KPIs
+		lineageTag: 76151667-75e8-4df0-9098-4e41a7a8d9ec
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure '% Change vs Last Week' = ```
+			
+			VAR MaxDate = MAX('dimDate'[Date])
+			VAR StartOfThisWeek = MaxDate - WEEKDAY(MaxDate, 2) + 1   -- 2 = Monday
+			VAR StartOfLastWeek = StartOfThisWeek - 7
+			VAR EndOfLastWeek = StartOfThisWeek - 1
+			
+			VAR Crimes_Last_Week =
+			    CALCULATE(
+			        [Total Incidents],
+			        'dimDate'[Date] >= StartOfLastWeek && 'dimDate'[Date] <= EndOfLastWeek
+			    )
+			
+			RETURN
+			    DIVIDE([Total Incidents] - Crimes_Last_Week, Crimes_Last_Week)
+			
+			```
+		displayFolder: KPIs
+		lineageTag: 536a1e0b-a2b2-437f-a37b-579d54a1f313
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
 	column CCN
 		dataType: int64
 		formatString: 0
