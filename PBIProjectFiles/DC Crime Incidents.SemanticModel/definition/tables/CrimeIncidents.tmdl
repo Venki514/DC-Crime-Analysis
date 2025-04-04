@@ -5,10 +5,10 @@ table CrimeIncidents
 		dataType: int64
 		formatString: 0
 		lineageTag: 4671c309-49fe-464a-b4e3-740dcd30a0f3
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: CCN
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column SHIFT
 		dataType: string
@@ -45,20 +45,20 @@ table CrimeIncidents
 	column XBLOCK
 		dataType: double
 		lineageTag: 429d3123-1502-453f-9e8c-977f2e3c76db
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: XBLOCK
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
 	column YBLOCK
 		dataType: double
 		lineageTag: f056167d-d47b-4f15-8ab5-c4241cc4638a
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: YBLOCK
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
@@ -66,10 +66,10 @@ table CrimeIncidents
 		dataType: int64
 		formatString: 0
 		lineageTag: 1657141a-2a7a-4a8d-93fe-4369cf30e8c3
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: WARD
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column ANC
 		dataType: string
@@ -83,19 +83,19 @@ table CrimeIncidents
 		dataType: int64
 		formatString: 0
 		lineageTag: 5336a378-ef9a-448d-a6bb-558649475c3f
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: DISTRICT
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column PSA
 		dataType: int64
 		formatString: 0
 		lineageTag: 7a5df3ed-7f7c-40d1-96e1-772d69f37770
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: PSA
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column NEIGHBORHOOD_CLUSTER
 		dataType: string
@@ -163,10 +163,10 @@ table CrimeIncidents
 		dataType: int64
 		formatString: 0
 		lineageTag: 342410b1-382a-4adc-9885-efa20671eddc
-		summarizeBy: count
+		summarizeBy: none
 		sourceColumn: OBJECTID
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column REPORT_DATE
 		dataType: dateTime
