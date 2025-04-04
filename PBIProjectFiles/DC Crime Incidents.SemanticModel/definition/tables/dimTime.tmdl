@@ -16,19 +16,19 @@ table dimTime
 		dataType: int64
 		formatString: 0
 		lineageTag: c2c9a363-e92b-421b-b8ec-a19f56aff59b
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: Hour
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column Minute
 		dataType: int64
 		formatString: 0
 		lineageTag: 0eb82146-1455-456c-912a-b5e7a4e26531
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: Minute
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column '12H Format'
 		dataType: string
@@ -58,10 +58,10 @@ table dimTime
 		dataType: int64
 		formatString: 0
 		lineageTag: 15b58c4d-4502-4c08-ad79-d21d3d8a09ea
-		summarizeBy: count
+		summarizeBy: none
 		sourceColumn: TimeKey
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition dimTime = m
 		mode: import

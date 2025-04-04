@@ -16,10 +16,10 @@ table dimDate
 		dataType: int64
 		formatString: 0
 		lineageTag: 55e4b93b-910f-4eeb-a319-4d3dfa547139
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: Year
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column Quarter
 		dataType: string
@@ -33,10 +33,10 @@ table dimDate
 		dataType: int64
 		formatString: 0
 		lineageTag: fca1b5d0-abaa-48e7-b9a3-a9e82f51f931
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: Month
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Month Name'
 		dataType: string
@@ -50,19 +50,19 @@ table dimDate
 		dataType: int64
 		formatString: 0
 		lineageTag: 14fd8373-443c-4215-a0a2-cb91dccecaf4
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: Day
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Day of Week'
 		dataType: int64
 		formatString: 0
 		lineageTag: 21b8956a-734d-41bd-aa28-82b0c8ceb0ee
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: Day of Week
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Day Name'
 		dataType: string
@@ -76,19 +76,19 @@ table dimDate
 		dataType: int64
 		formatString: 0
 		lineageTag: b0e52330-d050-4722-8e40-5486b8f49007
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: Week of Year
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'ISO Week Number'
 		dataType: int64
 		formatString: 0
 		lineageTag: d5777492-dfcd-47b2-a0c6-e4e65624d71f
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: ISO Week Number
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column Year-Quarter
 		dataType: string
@@ -110,10 +110,10 @@ table dimDate
 		dataType: int64
 		formatString: 0
 		lineageTag: ab66b518-500b-465d-9ed2-a5c6b06d056e
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: Fiscal Year
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Fiscal Quarter'
 		dataType: string
@@ -136,10 +136,10 @@ table dimDate
 		dataType: int64
 		formatString: 0
 		lineageTag: bf60683b-d27c-4325-b8e7-293a49dee67e
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: Days in Month
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column DateKey
 		dataType: int64
