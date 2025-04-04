@@ -150,6 +150,31 @@ table dimDate
 
 		annotation SummarizationSetBy = Automatic
 
+	column 'Month Short'
+		dataType: string
+		lineageTag: 279de330-d063-46a2-b3e0-90c4ee6a444e
+		summarizeBy: none
+		sourceColumn: Month Short
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Day Short'
+		dataType: string
+		lineageTag: 85591573-0c57-4c87-b09a-f3dbc798a74c
+		summarizeBy: none
+		sourceColumn: Day Short
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Day of Year'
+		dataType: int64
+		formatString: 0
+		lineageTag: 12f91ff5-33eb-4949-9876-37e08285cb5c
+		summarizeBy: none
+		sourceColumn: Day of Year
+
+		annotation SummarizationSetBy = Automatic
+
 	partition dimDate = m
 		mode: import
 		source = ```
@@ -169,25 +194,40 @@ table dimDate
 				    #"Added Quarter" = Table.AddColumn(#"Added Year", "Quarter", each "Q" & Text.From(Date.QuarterOfYear([Date])), type text),
 				    #"Added Month" = Table.AddColumn(#"Added Quarter", "Month", each Date.Month([Date]), Int64.Type),
 				    #"Added Month Name" = Table.AddColumn(#"Added Month", "Month Name", each Date.ToText([Date], "MMMM"), type text),
-				    #"Added Day" = Table.AddColumn(#"Added Month Name", "Day", each Date.Day([Date]), Int64.Type),
+				    #"Added Month Short" = Table.AddColumn(#"Added Month Name", "Month Short", each Date.ToText([Date], "MMM"), type text),
+				    #"Added Day" = Table.AddColumn(#"Added Month Short", "Day", each Date.Day([Date]), Int64.Type),
 				    #"Added Day of Week" = Table.AddColumn(#"Added Day", "Day of Week", each Date.DayOfWeek([Date], Day.Monday) + 1, Int64.Type),
 				    #"Added Day Name" = Table.AddColumn(#"Added Day of Week", "Day Name", each Date.ToText([Date], "dddd"), type text),
-				    #"Added Week of Year" = Table.AddColumn(#"Added Day Name", "Week of Year", each Date.WeekOfYear([Date]), Int64.Type),
+				    #"Added Day Short" = Table.AddColumn(#"Added Day Name", "Day Short", each Date.ToText([Date], "ddd"), type text),
+				    #"Added Week of Year" = Table.AddColumn(#"Added Day Short", "Week of Year", each Date.WeekOfYear([Date]), Int64.Type),
 				    #"Added ISO Week Number" = Table.AddColumn(#"Added Week of Year", "ISO Week Number", each Date.WeekOfYear([Date], Day.Monday), Int64.Type),
-				    #"Added Year Quarter" = Table.AddColumn(#"Added ISO Week Number", "Year-Quarter", each Text.From(Date.Year([Date])) & "-Q" & Text.From(Date.QuarterOfYear([Date])), type text),
-				    #"Added Year Month" = Table.AddColumn(#"Added Year Quarter", "Year-Month", each Text.From(Date.Year([Date])) & "-" & Text.PadStart(Text.From(Date.Month([Date])),2, "0"), type text),
-				    #"Added Fiscal Year" = Table.AddColumn(#"Added Year Month", "Fiscal Year", each if Date.Month([Date]) >= 7 then Date.Year([Date]) + 1 else Date.Year([Date]), Int64.Type),
-				    #"Added Fiscal Quarter" = Table.AddColumn(#"Added Fiscal Year", "Fiscal Quarter", each "Q" & Text.From(if Date.QuarterOfYear([Date]) >= 3 then Date.QuarterOfYear([Date]) - 2 else Date.QuarterOfYear([Date]) + 2), type text),
-				    #"Added Is Weekend" = Table.AddColumn(#"Added Fiscal Quarter", "Is Weekend", each Date.DayOfWeek([Date]) = Day.Saturday or Date.DayOfWeek([Date]) = Day.Sunday, type logical),
+				    #"Added Year Quarter" = Table.AddColumn(#"Added ISO Week Number", "Year-Quarter", each Text.From([Year]) & "-" & [Quarter], type text),
+				    #"Added Year Month" = Table.AddColumn(#"Added Year Quarter", "Year-Month", each Text.From([Year]) & "-" & Text.PadStart(Text.From([Month]), 2, "0"), type text),
+				    #"Added Fiscal Year" = Table.AddColumn(#"Added Year Month", "Fiscal Year", each if [Month] >= 7 then [Year] + 1 else [Year], Int64.Type),
+				    #"Added Fiscal Quarter" = Table.AddColumn(#"Added Fiscal Year", "Fiscal Quarter", each 
+				        if [Month] >= 7 and [Month] <= 9 then "Q1" 
+				        else if [Month] >= 10 and [Month] <= 12 then "Q2"
+				        else if [Month] >= 1 and [Month] <= 3 then "Q3"
+				        else "Q4", type text),
+				    #"Added Is Weekend" = Table.AddColumn(#"Added Fiscal Quarter", "Is Weekend", each [Day Name] = "Saturday" or [Day Name] = "Sunday", type logical),
 				    #"Added Days in Month" = Table.AddColumn(#"Added Is Weekend", "Days in Month", each Date.DaysInMonth([Date]), Int64.Type),
-				    #"Added DateKey" = Table.AddColumn(#"Added Days in Month", "DateKey", each Date.Year([Date]) * 10000 + Date.Month([Date]) * 100 + Date.Day([Date]), Int64.Type),
-				    // Change data types
-				    #"Changed Types" = Table.TransformColumnTypes(#"Added DateKey", {
-				        {"Date", type date}, {"Year", Int64.Type}, {"Quarter", type text}, {"Month", Int64.Type}, 
-				        {"Month Name", type text}, {"Day", Int64.Type}, {"Day of Week", Int64.Type}, {"Day Name", type text}, 
-				        {"Week of Year", Int64.Type}, {"ISO Week Number", Int64.Type}, {"Year-Quarter", type text}, 
-				        {"Year-Month", type text}, {"Fiscal Year", Int64.Type}, {"Fiscal Quarter", type text}, 
-				        {"Is Weekend", type logical}, {"Days in Month", Int64.Type}, {"DateKey", Int64.Type}
+				    #"Added DateKey" = Table.AddColumn(#"Added Days in Month", "DateKey", each [Year] * 10000 + [Month] * 100 + [Day], Int64.Type),
+				    #"Added Day of Year" = Table.AddColumn(#"Added DateKey", "Day of Year", each Date.DayOfYear([Date]), Int64.Type),
+				    
+				    // Set final column order and types
+				    #"Reordered Columns" = Table.ReorderColumns(#"Added Day of Year", {
+				        "Date", "DateKey", "Year", "Quarter", "Year-Quarter", "Month", "Month Name", "Month Short", 
+				        "Day", "Day of Week", "Day Name", "Day Short", "Day of Year", "Week of Year", "ISO Week Number", 
+				        "Year-Month", "Fiscal Year", "Fiscal Quarter", "Is Weekend", "Days in Month"
+				    }),
+				    
+				    #"Changed Types" = Table.TransformColumnTypes(#"Reordered Columns", {
+				        {"Date", type date}, {"DateKey", Int64.Type}, {"Year", Int64.Type}, {"Quarter", type text}, 
+				        {"Year-Quarter", type text}, {"Month", Int64.Type}, {"Month Name", type text}, {"Month Short", type text},
+				        {"Day", Int64.Type}, {"Day of Week", Int64.Type}, {"Day Name", type text}, {"Day Short", type text},
+				        {"Day of Year", Int64.Type}, {"Week of Year", Int64.Type}, {"ISO Week Number", Int64.Type},
+				        {"Year-Month", type text}, {"Fiscal Year", Int64.Type}, {"Fiscal Quarter", type text},
+				        {"Is Weekend", type logical}, {"Days in Month", Int64.Type}
 				    })
 				in
 				    #"Changed Types"
