@@ -1,17 +1,80 @@
 expression CrimeIncidents_2023 = ```
 		let
-		    Source = Json.Document(Web.Contents("https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/5/query?outFields=*&where=1%3D1&f=geojson")), 
-		    ExtractFeatures = Source[features], 
+		    // --- Parameters for Pagination ---
+		    BaseUrl = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/5/query",
+		    // MaxRecordCount found previously
+		    PageSize = 1000, 
+		    // Standard query parameters (excluding pagination)
+		    BaseQuery = [
+		        where = "1=1",
+		        outFields = "*",
+		        f = "geojson",
+		        outSR = "4326" // Good practice for GeoJSON
+		    ],
+		
+		    // --- Function to Fetch a Single Page ---
+		    // Takes the offset as input, returns the JSON document for that page
+		    // Includes basic error handling for the web request
+		    FetchPage = (offset as number) as record =>
+		        let
+		            // Add pagination parameters to the base query
+		            PageQuery = BaseQuery & [
+		                resultOffset = Text.From(offset), 
+		                resultRecordCount = Text.From(PageSize)
+		            ],
+		            // Make the web request
+		            RawResponse = try Web.Contents(BaseUrl, [Query = PageQuery]),
+		            // Check for web request errors
+		            JsonResult = if RawResponse[HasError] then null else Json.Document(RawResponse[Value]) 
+		        in
+		            JsonResult,
+		
+		    // --- Generate List of Pages using List.Generate ---
+		    // Each item in the generated list will be the list of 'features' from one page
+		    ListOfFeaturePages = List.Generate(
+		        // Initial value function: Fetch the first page (offset 0)
+		        () => [PageResult = FetchPage(0), Offset = 0],
+		
+		        // Condition function: Continue as long as the last page fetched was not null and contained features
+		        (Previous) => Previous[PageResult] <> null and List.Count(Previous[PageResult][features]?) > 0, 
+		
+		        // Next value function: Fetch the next page based on the offset from the previous step
+		        (Previous) => 
+		            let
+		                // Calculate the offset for the next page
+		                NextOffset = Previous[Offset] + List.Count(Previous[PageResult][features]),
+		                // Fetch the next page
+		                NextPageResult = FetchPage(NextOffset)
+		            in
+		                [PageResult = NextPageResult, Offset = NextOffset],
+		
+		        // Selector function: Extract the 'features' list from the current page's result
+		        // Use '?' for safe navigation in case PageResult or features is null
+		        (Current) => Current[PageResult][features]? 
+		    ),
+		
+		    // --- Combine Features from All Pages ---
+		    // Filter out any null pages that might result from errors or the final empty page
+		    CombinedFeatures = List.Combine(List.Select(ListOfFeaturePages, each _ <> null)),
+		
+		    // --- Create a Source Record similar to the original query ---
+		    // This allows the rest of your original script to work with minimal changes
+		    Source = [features = CombinedFeatures],
+		
+		    // --- PASTE YOUR ORIGINAL TRANSFORMATION STEPS BELOW, STARTING FROM HERE ---
+		    // --- (These steps will now operate on the 'CombinedFeatures' list) ---
+		
+		    ExtractFeatures = Source[features], // This now uses the combined list
 		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error), 
 		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}), 
-		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}), 
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
 		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}), 
 		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
 		    FilterValidDates = Table.SelectRows(SetColumnDataTypes, each ([START_DATE] <> null) and ([END_DATE] <> null)), 
 		    ConvertReportDateToDateTime = Table.AddColumn(FilterValidDates, "REPORT_DATETIME", each if [REPORT_DAT] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([REPORT_DAT] / 1000))), 
 		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([START_DATE] / 1000))), 
 		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([END_DATE] / 1000))), 
-		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date), 
+		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date),
 		    AddReportTime = Table.AddColumn(AddReportDate, "REPORT_TIME", each Time.From([REPORT_DATETIME]), type time), 
 		    AddStartDate = Table.AddColumn(AddReportTime, "START_DATE_ONLY", each Date.From([START_DATETIME]), type date), 
 		    AddStartTime = Table.AddColumn(AddStartDate, "START_TIME", each Time.From([START_DATETIME]), type time), 
@@ -31,18 +94,81 @@ expression CrimeIncidents_2023 = ```
 
 expression CrimeIncidents_2024 = ```
 		let
-		    Source = Json.Document(Web.Contents("https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/6/query?outFields=*&where=1%3D1&f=geojson")), 
-		    ExtractFeatures = Source[features], 
+		    // --- Parameters for Pagination ---
+		    BaseUrl = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/6/query",
+		    // MaxRecordCount found previously
+		    PageSize = 1000, 
+		    // Standard query parameters (excluding pagination)
+		    BaseQuery = [
+		        where = "1=1",
+		        outFields = "*",
+		        f = "geojson",
+		        outSR = "4326" // Good practice for GeoJSON
+		    ],
+		
+		    // --- Function to Fetch a Single Page ---
+		    // Takes the offset as input, returns the JSON document for that page
+		    // Includes basic error handling for the web request
+		    FetchPage = (offset as number) as record =>
+		        let
+		            // Add pagination parameters to the base query
+		            PageQuery = BaseQuery & [
+		                resultOffset = Text.From(offset), 
+		                resultRecordCount = Text.From(PageSize)
+		            ],
+		            // Make the web request
+		            RawResponse = try Web.Contents(BaseUrl, [Query = PageQuery]),
+		            // Check for web request errors
+		            JsonResult = if RawResponse[HasError] then null else Json.Document(RawResponse[Value]) 
+		        in
+		            JsonResult,
+		
+		    // --- Generate List of Pages using List.Generate ---
+		    // Each item in the generated list will be the list of 'features' from one page
+		    ListOfFeaturePages = List.Generate(
+		        // Initial value function: Fetch the first page (offset 0)
+		        () => [PageResult = FetchPage(0), Offset = 0],
+		
+		        // Condition function: Continue as long as the last page fetched was not null and contained features
+		        (Previous) => Previous[PageResult] <> null and List.Count(Previous[PageResult][features]?) > 0, 
+		
+		        // Next value function: Fetch the next page based on the offset from the previous step
+		        (Previous) => 
+		            let
+		                // Calculate the offset for the next page
+		                NextOffset = Previous[Offset] + List.Count(Previous[PageResult][features]),
+		                // Fetch the next page
+		                NextPageResult = FetchPage(NextOffset)
+		            in
+		                [PageResult = NextPageResult, Offset = NextOffset],
+		
+		        // Selector function: Extract the 'features' list from the current page's result
+		        // Use '?' for safe navigation in case PageResult or features is null
+		        (Current) => Current[PageResult][features]? 
+		    ),
+		
+		    // --- Combine Features from All Pages ---
+		    // Filter out any null pages that might result from errors or the final empty page
+		    CombinedFeatures = List.Combine(List.Select(ListOfFeaturePages, each _ <> null)),
+		
+		    // --- Create a Source Record similar to the original query ---
+		    // This allows the rest of your original script to work with minimal changes
+		    Source = [features = CombinedFeatures],
+		
+		    // --- PASTE YOUR ORIGINAL TRANSFORMATION STEPS BELOW, STARTING FROM HERE ---
+		    // --- (These steps will now operate on the 'CombinedFeatures' list) ---
+		
+		    ExtractFeatures = Source[features], // This now uses the combined list
 		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error), 
 		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}), 
-		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}), 
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
 		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}), 
 		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
 		    FilterValidDates = Table.SelectRows(SetColumnDataTypes, each ([START_DATE] <> null) and ([END_DATE] <> null)), 
 		    ConvertReportDateToDateTime = Table.AddColumn(FilterValidDates, "REPORT_DATETIME", each if [REPORT_DAT] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([REPORT_DAT] / 1000))), 
 		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([START_DATE] / 1000))), 
 		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([END_DATE] / 1000))), 
-		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date), 
+		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date),
 		    AddReportTime = Table.AddColumn(AddReportDate, "REPORT_TIME", each Time.From([REPORT_DATETIME]), type time), 
 		    AddStartDate = Table.AddColumn(AddReportTime, "START_DATE_ONLY", each Date.From([START_DATETIME]), type date), 
 		    AddStartTime = Table.AddColumn(AddStartDate, "START_TIME", each Time.From([START_DATETIME]), type time), 
@@ -62,18 +188,81 @@ expression CrimeIncidents_2024 = ```
 
 expression CrimeIncidents_2025 = ```
 		let
-		    Source = Json.Document(Web.Contents("https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/7/query?outFields=*&where=1%3D1&f=geojson")), 
-		    ExtractFeatures = Source[features], 
+		    // --- Parameters for Pagination ---
+		    BaseUrl = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/7/query",
+		    // MaxRecordCount found previously
+		    PageSize = 1000, 
+		    // Standard query parameters (excluding pagination)
+		    BaseQuery = [
+		        where = "1=1",
+		        outFields = "*",
+		        f = "geojson",
+		        outSR = "4326" // Good practice for GeoJSON
+		    ],
+		
+		    // --- Function to Fetch a Single Page ---
+		    // Takes the offset as input, returns the JSON document for that page
+		    // Includes basic error handling for the web request
+		    FetchPage = (offset as number) as record =>
+		        let
+		            // Add pagination parameters to the base query
+		            PageQuery = BaseQuery & [
+		                resultOffset = Text.From(offset), 
+		                resultRecordCount = Text.From(PageSize)
+		            ],
+		            // Make the web request
+		            RawResponse = try Web.Contents(BaseUrl, [Query = PageQuery]),
+		            // Check for web request errors
+		            JsonResult = if RawResponse[HasError] then null else Json.Document(RawResponse[Value]) 
+		        in
+		            JsonResult,
+		
+		    // --- Generate List of Pages using List.Generate ---
+		    // Each item in the generated list will be the list of 'features' from one page
+		    ListOfFeaturePages = List.Generate(
+		        // Initial value function: Fetch the first page (offset 0)
+		        () => [PageResult = FetchPage(0), Offset = 0],
+		
+		        // Condition function: Continue as long as the last page fetched was not null and contained features
+		        (Previous) => Previous[PageResult] <> null and List.Count(Previous[PageResult][features]?) > 0, 
+		
+		        // Next value function: Fetch the next page based on the offset from the previous step
+		        (Previous) => 
+		            let
+		                // Calculate the offset for the next page
+		                NextOffset = Previous[Offset] + List.Count(Previous[PageResult][features]),
+		                // Fetch the next page
+		                NextPageResult = FetchPage(NextOffset)
+		            in
+		                [PageResult = NextPageResult, Offset = NextOffset],
+		
+		        // Selector function: Extract the 'features' list from the current page's result
+		        // Use '?' for safe navigation in case PageResult or features is null
+		        (Current) => Current[PageResult][features]? 
+		    ),
+		
+		    // --- Combine Features from All Pages ---
+		    // Filter out any null pages that might result from errors or the final empty page
+		    CombinedFeatures = List.Combine(List.Select(ListOfFeaturePages, each _ <> null)),
+		
+		    // --- Create a Source Record similar to the original query ---
+		    // This allows the rest of your original script to work with minimal changes
+		    Source = [features = CombinedFeatures],
+		
+		    // --- PASTE YOUR ORIGINAL TRANSFORMATION STEPS BELOW, STARTING FROM HERE ---
+		    // --- (These steps will now operate on the 'CombinedFeatures' list) ---
+		
+		    ExtractFeatures = Source[features], // This now uses the combined list
 		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error), 
 		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}), 
-		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}), 
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
 		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}), 
 		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
 		    FilterValidDates = Table.SelectRows(SetColumnDataTypes, each ([START_DATE] <> null) and ([END_DATE] <> null)), 
 		    ConvertReportDateToDateTime = Table.AddColumn(FilterValidDates, "REPORT_DATETIME", each if [REPORT_DAT] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([REPORT_DAT] / 1000))), 
 		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([START_DATE] / 1000))), 
 		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([END_DATE] / 1000))), 
-		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date), 
+		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date),
 		    AddReportTime = Table.AddColumn(AddReportDate, "REPORT_TIME", each Time.From([REPORT_DATETIME]), type time), 
 		    AddStartDate = Table.AddColumn(AddReportTime, "START_DATE_ONLY", each Date.From([START_DATETIME]), type date), 
 		    AddStartTime = Table.AddColumn(AddStartDate, "START_TIME", each Time.From([START_DATETIME]), type time), 
@@ -81,11 +270,485 @@ expression CrimeIncidents_2025 = ```
 		    AddEndTime = Table.AddColumn(AddEndDate, "END_TIME", each Time.From([END_DATETIME]), type time), 
 		    RoundToNearest15Mins = Table.AddColumn(AddEndTime, "NEAREST_15M_TIME", each let t = Time.From([START_TIME]), m = Number.Round(Time.Minute(t) / 15) * 15 in if m = 60 then #time(Time.Hour(t) + 1, 0, 0) else #time(Time.Hour(t), m, 0), type time), 
 		    RemoveOriginalDateColumns = Table.RemoveColumns(RoundToNearest15Mins,{"OCTO_RECORD_ID", "START_DATETIME", "END_DATETIME", "REPORT_DATETIME", "START_DATE", "END_DATE", "REPORT_DAT"}),
-		    FinalTable = Table.SelectRows(RemoveOriginalDateColumns, each true)
+		    FinalTable = Table.SelectRows(RemoveOriginalDateColumns, each true),
+		    #"Filtered Rows" = Table.SelectRows(FinalTable, each ([START_DATE_ONLY] <> #date(1025, 3, 24) and [START_DATE_ONLY] <> #date(1989, 5, 19) and [START_DATE_ONLY] <> #date(2005, 9, 27)))
+		in
+		    #"Filtered Rows"
+		```
+	lineageTag: 108eed28-cc48-46b2-8483-986eb5535e87
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+
+expression CrimeIncidents_2019 = ```
+		let
+		    // --- Parameters for Pagination ---
+		    BaseUrl = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/1/query",
+		    // MaxRecordCount found previously
+		    PageSize = 1000, 
+		    // Standard query parameters (excluding pagination)
+		    BaseQuery = [
+		        where = "1=1",
+		        outFields = "*",
+		        f = "geojson",
+		        outSR = "4326" // Good practice for GeoJSON
+		    ],
+		
+		    // --- Function to Fetch a Single Page ---
+		    // Takes the offset as input, returns the JSON document for that page
+		    // Includes basic error handling for the web request
+		    FetchPage = (offset as number) as record =>
+		        let
+		            // Add pagination parameters to the base query
+		            PageQuery = BaseQuery & [
+		                resultOffset = Text.From(offset), 
+		                resultRecordCount = Text.From(PageSize)
+		            ],
+		            // Make the web request
+		            RawResponse = try Web.Contents(BaseUrl, [Query = PageQuery]),
+		            // Check for web request errors
+		            JsonResult = if RawResponse[HasError] then null else Json.Document(RawResponse[Value]) 
+		        in
+		            JsonResult,
+		
+		    // --- Generate List of Pages using List.Generate ---
+		    // Each item in the generated list will be the list of 'features' from one page
+		    ListOfFeaturePages = List.Generate(
+		        // Initial value function: Fetch the first page (offset 0)
+		        () => [PageResult = FetchPage(0), Offset = 0],
+		
+		        // Condition function: Continue as long as the last page fetched was not null and contained features
+		        (Previous) => Previous[PageResult] <> null and List.Count(Previous[PageResult][features]?) > 0, 
+		
+		        // Next value function: Fetch the next page based on the offset from the previous step
+		        (Previous) => 
+		            let
+		                // Calculate the offset for the next page
+		                NextOffset = Previous[Offset] + List.Count(Previous[PageResult][features]),
+		                // Fetch the next page
+		                NextPageResult = FetchPage(NextOffset)
+		            in
+		                [PageResult = NextPageResult, Offset = NextOffset],
+		
+		        // Selector function: Extract the 'features' list from the current page's result
+		        // Use '?' for safe navigation in case PageResult or features is null
+		        (Current) => Current[PageResult][features]? 
+		    ),
+		
+		    // --- Combine Features from All Pages ---
+		    // Filter out any null pages that might result from errors or the final empty page
+		    CombinedFeatures = List.Combine(List.Select(ListOfFeaturePages, each _ <> null)),
+		
+		    // --- Create a Source Record similar to the original query ---
+		    // This allows the rest of your original script to work with minimal changes
+		    Source = [features = CombinedFeatures],
+		
+		    // --- PASTE YOUR ORIGINAL TRANSFORMATION STEPS BELOW, STARTING FROM HERE ---
+		    // --- (These steps will now operate on the 'CombinedFeatures' list) ---
+		
+		    ExtractFeatures = Source[features], // This now uses the combined list
+		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error), 
+		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}), 
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
+		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}), 
+		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
+		    FilterValidDates = Table.SelectRows(SetColumnDataTypes, each ([START_DATE] <> null) and ([END_DATE] <> null)), 
+		    ConvertReportDateToDateTime = Table.AddColumn(FilterValidDates, "REPORT_DATETIME", each if [REPORT_DAT] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([REPORT_DAT] / 1000))), 
+		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([START_DATE] / 1000))), 
+		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([END_DATE] / 1000))), 
+		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date),
+		    AddReportTime = Table.AddColumn(AddReportDate, "REPORT_TIME", each Time.From([REPORT_DATETIME]), type time), 
+		    AddStartDate = Table.AddColumn(AddReportTime, "START_DATE_ONLY", each Date.From([START_DATETIME]), type date), 
+		    AddStartTime = Table.AddColumn(AddStartDate, "START_TIME", each Time.From([START_DATETIME]), type time), 
+		    AddEndDate = Table.AddColumn(AddStartTime, "END_DATE_ONLY", each Date.From([END_DATETIME]), type date), 
+		    AddEndTime = Table.AddColumn(AddEndDate, "END_TIME", each Time.From([END_DATETIME]), type time), 
+		    RoundToNearest15Mins = Table.AddColumn(AddEndTime, "NEAREST_15M_TIME", each let t = Time.From([START_TIME]), m = Number.Round(Time.Minute(t) / 15) * 15 in if m = 60 then #time(Time.Hour(t) + 1, 0, 0) else #time(Time.Hour(t), m, 0), type time), 
+		    RemoveOriginalDateColumns = Table.RemoveColumns(RoundToNearest15Mins,{"OCTO_RECORD_ID", "START_DATETIME", "END_DATETIME", "REPORT_DATETIME", "START_DATE", "END_DATE", "REPORT_DAT"}),
+		    FinalTable = Table.SelectRows(RemoveOriginalDateColumns, each ([START_DATE_ONLY] <> #date(2017, 6, 9)))
 		in
 		    FinalTable
 		```
-	lineageTag: 108eed28-cc48-46b2-8483-986eb5535e87
+	lineageTag: 87b5187a-0a4c-4a89-b117-6cf3c0f23974
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+
+expression CrimeIncidents_2020 = ```
+		let
+		    // --- Parameters for Pagination ---
+		    BaseUrl = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/2/query",
+		    // MaxRecordCount found previously
+		    PageSize = 1000, 
+		    // Standard query parameters (excluding pagination)
+		    BaseQuery = [
+		        where = "1=1",
+		        outFields = "*",
+		        f = "geojson",
+		        outSR = "4326" // Good practice for GeoJSON
+		    ],
+		
+		    // --- Function to Fetch a Single Page ---
+		    // Takes the offset as input, returns the JSON document for that page
+		    // Includes basic error handling for the web request
+		    FetchPage = (offset as number) as record =>
+		        let
+		            // Add pagination parameters to the base query
+		            PageQuery = BaseQuery & [
+		                resultOffset = Text.From(offset), 
+		                resultRecordCount = Text.From(PageSize)
+		            ],
+		            // Make the web request
+		            RawResponse = try Web.Contents(BaseUrl, [Query = PageQuery]),
+		            // Check for web request errors
+		            JsonResult = if RawResponse[HasError] then null else Json.Document(RawResponse[Value]) 
+		        in
+		            JsonResult,
+		
+		    // --- Generate List of Pages using List.Generate ---
+		    // Each item in the generated list will be the list of 'features' from one page
+		    ListOfFeaturePages = List.Generate(
+		        // Initial value function: Fetch the first page (offset 0)
+		        () => [PageResult = FetchPage(0), Offset = 0],
+		
+		        // Condition function: Continue as long as the last page fetched was not null and contained features
+		        (Previous) => Previous[PageResult] <> null and List.Count(Previous[PageResult][features]?) > 0, 
+		
+		        // Next value function: Fetch the next page based on the offset from the previous step
+		        (Previous) => 
+		            let
+		                // Calculate the offset for the next page
+		                NextOffset = Previous[Offset] + List.Count(Previous[PageResult][features]),
+		                // Fetch the next page
+		                NextPageResult = FetchPage(NextOffset)
+		            in
+		                [PageResult = NextPageResult, Offset = NextOffset],
+		
+		        // Selector function: Extract the 'features' list from the current page's result
+		        // Use '?' for safe navigation in case PageResult or features is null
+		        (Current) => Current[PageResult][features]? 
+		    ),
+		
+		    // --- Combine Features from All Pages ---
+		    // Filter out any null pages that might result from errors or the final empty page
+		    CombinedFeatures = List.Combine(List.Select(ListOfFeaturePages, each _ <> null)),
+		
+		    // --- Create a Source Record similar to the original query ---
+		    // This allows the rest of your original script to work with minimal changes
+		    Source = [features = CombinedFeatures],
+		
+		    // --- PASTE YOUR ORIGINAL TRANSFORMATION STEPS BELOW, STARTING FROM HERE ---
+		    // --- (These steps will now operate on the 'CombinedFeatures' list) ---
+		
+		    ExtractFeatures = Source[features], // This now uses the combined list
+		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error), 
+		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}), 
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
+		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}), 
+		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
+		    FilterValidDates = Table.SelectRows(SetColumnDataTypes, each ([START_DATE] <> null) and ([END_DATE] <> null)), 
+		    ConvertReportDateToDateTime = Table.AddColumn(FilterValidDates, "REPORT_DATETIME", each if [REPORT_DAT] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([REPORT_DAT] / 1000))), 
+		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([START_DATE] / 1000))), 
+		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([END_DATE] / 1000))), 
+		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date),
+		    AddReportTime = Table.AddColumn(AddReportDate, "REPORT_TIME", each Time.From([REPORT_DATETIME]), type time), 
+		    AddStartDate = Table.AddColumn(AddReportTime, "START_DATE_ONLY", each Date.From([START_DATETIME]), type date), 
+		    AddStartTime = Table.AddColumn(AddStartDate, "START_TIME", each Time.From([START_DATETIME]), type time), 
+		    AddEndDate = Table.AddColumn(AddStartTime, "END_DATE_ONLY", each Date.From([END_DATETIME]), type date), 
+		    AddEndTime = Table.AddColumn(AddEndDate, "END_TIME", each Time.From([END_DATETIME]), type time), 
+		    RoundToNearest15Mins = Table.AddColumn(AddEndTime, "NEAREST_15M_TIME", each let t = Time.From([START_TIME]), m = Number.Round(Time.Minute(t) / 15) * 15 in if m = 60 then #time(Time.Hour(t) + 1, 0, 0) else #time(Time.Hour(t), m, 0), type time), 
+		    RemoveOriginalDateColumns = Table.RemoveColumns(RoundToNearest15Mins,{"OCTO_RECORD_ID", "START_DATETIME", "END_DATETIME", "REPORT_DATETIME", "START_DATE", "END_DATE", "REPORT_DAT"}),
+		    FinalTable = Table.SelectRows(RemoveOriginalDateColumns, each ([START_DATE_ONLY] <> #date(2017, 6, 9))),
+		    #"Filtered Rows" = Table.SelectRows(FinalTable, each [START_DATE_ONLY] >= #date(2020, 1, 1))
+		in
+		    #"Filtered Rows"
+		```
+	lineageTag: 79ec69f7-f19e-4b4c-b8be-9a7e18c36fb5
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+
+expression CrimeIncidents_2020_2 = ```
+		let
+		    // --- Parameters for Pagination ---
+		    BaseUrl = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/2/query",
+		    // MaxRecordCount found previously
+		    PageSize = 1000, 
+		    // Standard query parameters (excluding pagination)
+		    BaseQuery = [
+		        where = "1=1",
+		        outFields = "*",
+		        f = "geojson",
+		        outSR = "4326" // Good practice for GeoJSON
+		    ],
+		
+		    // --- Function to Fetch a Single Page ---
+		    // Takes the offset as input, returns the JSON document for that page
+		    // Includes basic error handling for the web request
+		    FetchPage = (offset as number) as record =>
+		        let
+		            // Add pagination parameters to the base query
+		            PageQuery = BaseQuery & [
+		                resultOffset = Text.From(offset), 
+		                resultRecordCount = Text.From(PageSize)
+		            ],
+		            // Make the web request
+		            RawResponse = try Web.Contents(BaseUrl, [Query = PageQuery]),
+		            // Check for web request errors
+		            JsonResult = if RawResponse[HasError] then null else Json.Document(RawResponse[Value]) 
+		        in
+		            JsonResult,
+		
+		    // --- Generate List of Pages using List.Generate ---
+		    // Each item in the generated list will be the list of 'features' from one page
+		    ListOfFeaturePages = List.Generate(
+		        // Initial value function: Fetch the first page (offset 0)
+		        () => [PageResult = FetchPage(0), Offset = 0],
+		
+		        // Condition function: Continue as long as the last page fetched was not null and contained features
+		        (Previous) => Previous[PageResult] <> null and List.Count(Previous[PageResult][features]?) > 0, 
+		
+		        // Next value function: Fetch the next page based on the offset from the previous step
+		        (Previous) => 
+		            let
+		                // Calculate the offset for the next page
+		                NextOffset = Previous[Offset] + List.Count(Previous[PageResult][features]),
+		                // Fetch the next page
+		                NextPageResult = FetchPage(NextOffset)
+		            in
+		                [PageResult = NextPageResult, Offset = NextOffset],
+		
+		        // Selector function: Extract the 'features' list from the current page's result
+		        // Use '?' for safe navigation in case PageResult or features is null
+		        (Current) => Current[PageResult][features]? 
+		    ),
+		
+		    // --- Combine Features from All Pages ---
+		    // Filter out any null pages that might result from errors or the final empty page
+		    CombinedFeatures = List.Combine(List.Select(ListOfFeaturePages, each _ <> null)),
+		
+		    // --- Create a Source Record similar to the original query ---
+		    // This allows the rest of your original script to work with minimal changes
+		    Source = [features = CombinedFeatures],
+		
+		    // --- PASTE YOUR ORIGINAL TRANSFORMATION STEPS BELOW, STARTING FROM HERE ---
+		    // --- (These steps will now operate on the 'CombinedFeatures' list) ---
+		
+		    ExtractFeatures = Source[features], // This now uses the combined list
+		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error), 
+		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}), 
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
+		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}), 
+		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
+		    FilterValidDates = Table.SelectRows(SetColumnDataTypes, each ([START_DATE] <> null) and ([END_DATE] <> null)), 
+		    ConvertReportDateToDateTime = Table.AddColumn(FilterValidDates, "REPORT_DATETIME", each if [REPORT_DAT] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([REPORT_DAT] / 1000))), 
+		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([START_DATE] / 1000))), 
+		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([END_DATE] / 1000))), 
+		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date),
+		    AddReportTime = Table.AddColumn(AddReportDate, "REPORT_TIME", each Time.From([REPORT_DATETIME]), type time), 
+		    AddStartDate = Table.AddColumn(AddReportTime, "START_DATE_ONLY", each Date.From([START_DATETIME]), type date), 
+		    AddStartTime = Table.AddColumn(AddStartDate, "START_TIME", each Time.From([START_DATETIME]), type time), 
+		    AddEndDate = Table.AddColumn(AddStartTime, "END_DATE_ONLY", each Date.From([END_DATETIME]), type date), 
+		    AddEndTime = Table.AddColumn(AddEndDate, "END_TIME", each Time.From([END_DATETIME]), type time), 
+		    RoundToNearest15Mins = Table.AddColumn(AddEndTime, "NEAREST_15M_TIME", each let t = Time.From([START_TIME]), m = Number.Round(Time.Minute(t) / 15) * 15 in if m = 60 then #time(Time.Hour(t) + 1, 0, 0) else #time(Time.Hour(t), m, 0), type time), 
+		    RemoveOriginalDateColumns = Table.RemoveColumns(RoundToNearest15Mins,{"OCTO_RECORD_ID", "START_DATETIME", "END_DATETIME", "REPORT_DATETIME", "START_DATE", "END_DATE", "REPORT_DAT"}),
+		    FinalTable = Table.SelectRows(RemoveOriginalDateColumns, each ([START_DATE_ONLY] <> #date(2017, 6, 9) and [START_DATE_ONLY] <> #date(2018, 3, 26) and [START_DATE_ONLY] <> #date(2018, 12, 29) and [START_DATE_ONLY] <> #date(2019, 12, 1) and [START_DATE_ONLY] <> #date(2019, 12, 10) and [START_DATE_ONLY] <> #date(2019, 12, 29) and [START_DATE_ONLY] <> #date(2019, 12, 31)))
+		in
+		    FinalTable
+		```
+	lineageTag: 0a2ee0dc-7dfd-4688-9947-795ed958e8a7
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+
+expression CrimeIncidents_2021 = ```
+		let
+		    // --- Parameters for Pagination ---
+		    BaseUrl = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/3/query",
+		    // MaxRecordCount found previously
+		    PageSize = 1000, 
+		    // Standard query parameters (excluding pagination)
+		    BaseQuery = [
+		        where = "1=1",
+		        outFields = "*",
+		        f = "geojson",
+		        outSR = "4326" // Good practice for GeoJSON
+		    ],
+		
+		    // --- Function to Fetch a Single Page ---
+		    // Takes the offset as input, returns the JSON document for that page
+		    // Includes basic error handling for the web request
+		    FetchPage = (offset as number) as record =>
+		        let
+		            // Add pagination parameters to the base query
+		            PageQuery = BaseQuery & [
+		                resultOffset = Text.From(offset), 
+		                resultRecordCount = Text.From(PageSize)
+		            ],
+		            // Make the web request
+		            RawResponse = try Web.Contents(BaseUrl, [Query = PageQuery]),
+		            // Check for web request errors
+		            JsonResult = if RawResponse[HasError] then null else Json.Document(RawResponse[Value]) 
+		        in
+		            JsonResult,
+		
+		    // --- Generate List of Pages using List.Generate ---
+		    // Each item in the generated list will be the list of 'features' from one page
+		    ListOfFeaturePages = List.Generate(
+		        // Initial value function: Fetch the first page (offset 0)
+		        () => [PageResult = FetchPage(0), Offset = 0],
+		
+		        // Condition function: Continue as long as the last page fetched was not null and contained features
+		        (Previous) => Previous[PageResult] <> null and List.Count(Previous[PageResult][features]?) > 0, 
+		
+		        // Next value function: Fetch the next page based on the offset from the previous step
+		        (Previous) => 
+		            let
+		                // Calculate the offset for the next page
+		                NextOffset = Previous[Offset] + List.Count(Previous[PageResult][features]),
+		                // Fetch the next page
+		                NextPageResult = FetchPage(NextOffset)
+		            in
+		                [PageResult = NextPageResult, Offset = NextOffset],
+		
+		        // Selector function: Extract the 'features' list from the current page's result
+		        // Use '?' for safe navigation in case PageResult or features is null
+		        (Current) => Current[PageResult][features]? 
+		    ),
+		
+		    // --- Combine Features from All Pages ---
+		    // Filter out any null pages that might result from errors or the final empty page
+		    CombinedFeatures = List.Combine(List.Select(ListOfFeaturePages, each _ <> null)),
+		
+		    // --- Create a Source Record similar to the original query ---
+		    // This allows the rest of your original script to work with minimal changes
+		    Source = [features = CombinedFeatures],
+		
+		    // --- PASTE YOUR ORIGINAL TRANSFORMATION STEPS BELOW, STARTING FROM HERE ---
+		    // --- (These steps will now operate on the 'CombinedFeatures' list) ---
+		
+		    ExtractFeatures = Source[features], // This now uses the combined list
+		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error), 
+		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}), 
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
+		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}), 
+		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
+		    FilterValidDates = Table.SelectRows(SetColumnDataTypes, each ([START_DATE] <> null) and ([END_DATE] <> null)), 
+		    ConvertReportDateToDateTime = Table.AddColumn(FilterValidDates, "REPORT_DATETIME", each if [REPORT_DAT] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([REPORT_DAT] / 1000))), 
+		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([START_DATE] / 1000))), 
+		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([END_DATE] / 1000))), 
+		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date),
+		    AddReportTime = Table.AddColumn(AddReportDate, "REPORT_TIME", each Time.From([REPORT_DATETIME]), type time), 
+		    AddStartDate = Table.AddColumn(AddReportTime, "START_DATE_ONLY", each Date.From([START_DATETIME]), type date), 
+		    AddStartTime = Table.AddColumn(AddStartDate, "START_TIME", each Time.From([START_DATETIME]), type time), 
+		    AddEndDate = Table.AddColumn(AddStartTime, "END_DATE_ONLY", each Date.From([END_DATETIME]), type date), 
+		    AddEndTime = Table.AddColumn(AddEndDate, "END_TIME", each Time.From([END_DATETIME]), type time), 
+		    RoundToNearest15Mins = Table.AddColumn(AddEndTime, "NEAREST_15M_TIME", each let t = Time.From([START_TIME]), m = Number.Round(Time.Minute(t) / 15) * 15 in if m = 60 then #time(Time.Hour(t) + 1, 0, 0) else #time(Time.Hour(t), m, 0), type time), 
+		    RemoveOriginalDateColumns = Table.RemoveColumns(RoundToNearest15Mins,{"OCTO_RECORD_ID", "START_DATETIME", "END_DATETIME", "REPORT_DATETIME", "START_DATE", "END_DATE", "REPORT_DAT"}),
+		    FinalTable = Table.SelectRows(RemoveOriginalDateColumns, each ([START_DATE_ONLY] <> #date(2017, 6, 9))),
+		    #"Filtered Rows" = Table.SelectRows(FinalTable, each [START_DATE_ONLY] >= #date(2021, 1, 1))
+		in
+		    #"Filtered Rows"
+		```
+	lineageTag: 5148cea9-ef8b-41d8-b946-3676885e2e15
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+
+expression CrimeIncidents_2022 = ```
+		let
+		    // --- Parameters for Pagination ---
+		    BaseUrl = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/4/query",
+		    // MaxRecordCount found previously
+		    PageSize = 1000, 
+		    // Standard query parameters (excluding pagination)
+		    BaseQuery = [
+		        where = "1=1",
+		        outFields = "*",
+		        f = "geojson",
+		        outSR = "4326" // Good practice for GeoJSON
+		    ],
+		
+		    // --- Function to Fetch a Single Page ---
+		    // Takes the offset as input, returns the JSON document for that page
+		    // Includes basic error handling for the web request
+		    FetchPage = (offset as number) as record =>
+		        let
+		            // Add pagination parameters to the base query
+		            PageQuery = BaseQuery & [
+		                resultOffset = Text.From(offset), 
+		                resultRecordCount = Text.From(PageSize)
+		            ],
+		            // Make the web request
+		            RawResponse = try Web.Contents(BaseUrl, [Query = PageQuery]),
+		            // Check for web request errors
+		            JsonResult = if RawResponse[HasError] then null else Json.Document(RawResponse[Value]) 
+		        in
+		            JsonResult,
+		
+		    // --- Generate List of Pages using List.Generate ---
+		    // Each item in the generated list will be the list of 'features' from one page
+		    ListOfFeaturePages = List.Generate(
+		        // Initial value function: Fetch the first page (offset 0)
+		        () => [PageResult = FetchPage(0), Offset = 0],
+		
+		        // Condition function: Continue as long as the last page fetched was not null and contained features
+		        (Previous) => Previous[PageResult] <> null and List.Count(Previous[PageResult][features]?) > 0, 
+		
+		        // Next value function: Fetch the next page based on the offset from the previous step
+		        (Previous) => 
+		            let
+		                // Calculate the offset for the next page
+		                NextOffset = Previous[Offset] + List.Count(Previous[PageResult][features]),
+		                // Fetch the next page
+		                NextPageResult = FetchPage(NextOffset)
+		            in
+		                [PageResult = NextPageResult, Offset = NextOffset],
+		
+		        // Selector function: Extract the 'features' list from the current page's result
+		        // Use '?' for safe navigation in case PageResult or features is null
+		        (Current) => Current[PageResult][features]? 
+		    ),
+		
+		    // --- Combine Features from All Pages ---
+		    // Filter out any null pages that might result from errors or the final empty page
+		    CombinedFeatures = List.Combine(List.Select(ListOfFeaturePages, each _ <> null)),
+		
+		    // --- Create a Source Record similar to the original query ---
+		    // This allows the rest of your original script to work with minimal changes
+		    Source = [features = CombinedFeatures],
+		
+		    // --- PASTE YOUR ORIGINAL TRANSFORMATION STEPS BELOW, STARTING FROM HERE ---
+		    // --- (These steps will now operate on the 'CombinedFeatures' list) ---
+		
+		    ExtractFeatures = Source[features], // This now uses the combined list
+		    FeaturesToTable = Table.FromList(ExtractFeatures, Splitter.SplitByNothing(), null, null, ExtraValues.Error), 
+		    ExpandFeatureRecords = Table.ExpandRecordColumn(FeaturesToTable, "Column1", {"type", "id", "geometry", "properties"}, {"type", "id", "geometry", "properties"}), 
+		    SelectPropertiesOnly = Table.SelectColumns(ExpandFeatureRecords,{"properties"}),
+		    ExpandAllPropertyFields = Table.ExpandRecordColumn(SelectPropertiesOnly, "properties", {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}, {"CCN", "REPORT_DAT", "SHIFT", "METHOD", "OFFENSE", "BLOCK", "XBLOCK", "YBLOCK", "WARD", "ANC", "DISTRICT", "PSA", "NEIGHBORHOOD_CLUSTER", "BLOCK_GROUP", "CENSUS_TRACT", "VOTING_PRECINCT", "LATITUDE", "LONGITUDE", "BID", "START_DATE", "END_DATE", "OBJECTID", "OCTO_RECORD_ID"}), 
+		    SetColumnDataTypes = Table.TransformColumnTypes(ExpandAllPropertyFields,{{"CCN", Int64.Type}, {"SHIFT", type text}, {"METHOD", type text}, {"OFFENSE", type text}, {"BLOCK", type text}, {"XBLOCK", type number}, {"YBLOCK", type number}, {"WARD", Int64.Type}, {"DISTRICT", Int64.Type}, {"ANC", type text}, {"PSA", Int64.Type}, {"NEIGHBORHOOD_CLUSTER", type text}, {"BLOCK_GROUP", type text}, {"CENSUS_TRACT", type text}, {"VOTING_PRECINCT", type text}, {"LATITUDE", type number}, {"LONGITUDE", type number}, {"BID", type text}, {"OBJECTID", Int64.Type}}),
+		    FilterValidDates = Table.SelectRows(SetColumnDataTypes, each ([START_DATE] <> null) and ([END_DATE] <> null)), 
+		    ConvertReportDateToDateTime = Table.AddColumn(FilterValidDates, "REPORT_DATETIME", each if [REPORT_DAT] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([REPORT_DAT] / 1000))), 
+		    ConvertStartDateToDateTime = Table.AddColumn(ConvertReportDateToDateTime, "START_DATETIME", each if [START_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([START_DATE] / 1000))), 
+		    ConvertEndDateToDateTime = Table.AddColumn(ConvertStartDateToDateTime, "END_DATETIME", each if [END_DATE] = null then null else #datetime(1970,1,1,0,0,0) + #duration(0,0,0, Number.RoundDown([END_DATE] / 1000))), 
+		    AddReportDate = Table.AddColumn(ConvertEndDateToDateTime, "REPORT_DATE", each Date.From([REPORT_DATETIME]), type date),
+		    AddReportTime = Table.AddColumn(AddReportDate, "REPORT_TIME", each Time.From([REPORT_DATETIME]), type time), 
+		    AddStartDate = Table.AddColumn(AddReportTime, "START_DATE_ONLY", each Date.From([START_DATETIME]), type date), 
+		    AddStartTime = Table.AddColumn(AddStartDate, "START_TIME", each Time.From([START_DATETIME]), type time), 
+		    AddEndDate = Table.AddColumn(AddStartTime, "END_DATE_ONLY", each Date.From([END_DATETIME]), type date), 
+		    AddEndTime = Table.AddColumn(AddEndDate, "END_TIME", each Time.From([END_DATETIME]), type time), 
+		    RoundToNearest15Mins = Table.AddColumn(AddEndTime, "NEAREST_15M_TIME", each let t = Time.From([START_TIME]), m = Number.Round(Time.Minute(t) / 15) * 15 in if m = 60 then #time(Time.Hour(t) + 1, 0, 0) else #time(Time.Hour(t), m, 0), type time), 
+		    RemoveOriginalDateColumns = Table.RemoveColumns(RoundToNearest15Mins,{"OCTO_RECORD_ID", "START_DATETIME", "END_DATETIME", "REPORT_DATETIME", "START_DATE", "END_DATE", "REPORT_DAT"}),
+		    FinalTable = Table.SelectRows(RemoveOriginalDateColumns, each ([START_DATE_ONLY] <> #date(2017, 6, 9))),
+		    #"Filtered Rows" = Table.SelectRows(FinalTable, each [START_DATE_ONLY] >= #date(2022, 1, 1))
+		in
+		    #"Filtered Rows"
+		```
+	lineageTag: cb4df929-7001-4080-bc6e-f9dabb26a4c0
 
 	annotation PBI_NavigationStepName = Navigation
 

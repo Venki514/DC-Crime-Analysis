@@ -816,9 +816,9 @@ table CrimeIncidents
 		mode: import
 		source =
 				let
-				    Source = Table.Combine({CrimeIncidents_2023, CrimeIncidents_2024, CrimeIncidents_2025}),
+				    Source = Table.Combine({CrimeIncidents_2019, CrimeIncidents_2020, CrimeIncidents_2020_2, CrimeIncidents_2021, CrimeIncidents_2022, CrimeIncidents_2023, CrimeIncidents_2024, CrimeIncidents_2025}),
 				    #"Renamed Columns" = Table.RenameColumns(Source,{{"START_DATE_ONLY", "START_DATE"}, {"END_DATE_ONLY", "END_DATE"}, {"NEAREST_15M_TIME", "NEAREST_15M_START_TIME"}}),
-				    #"Filtered Rows" = Table.SelectRows(#"Renamed Columns", each [START_DATE] >= #date(2023, 1, 1))
+				    #"Filtered Rows" = Table.SelectRows(#"Renamed Columns", each ([START_DATE] <> #date(1940, 2, 17) and [START_DATE] <> #date(1970, 4, 8) and [START_DATE] <> #date(1992, 9, 30) and [START_DATE] <> #date(1993, 8, 29) and [START_DATE] <> #date(2005, 4, 17) and [START_DATE] <> #date(2005, 7, 18) and [START_DATE] <> #date(2010, 1, 1) and [START_DATE] <> #date(2010, 9, 2) and [START_DATE] <> #date(2012, 11, 18) and [START_DATE] <> #date(2012, 12, 5) and [START_DATE] <> #date(2013, 5, 25) and [START_DATE] <> #date(2013, 10, 16) and [START_DATE] <> #date(2014, 2, 2) and [START_DATE] <> #date(2015, 6, 24) and [START_DATE] <> #date(2016, 5, 11) and [START_DATE] <> #date(2016, 10, 20) and [START_DATE] <> #date(2016, 10, 28) and [START_DATE] <> #date(2016, 11, 9) and [START_DATE] <> #date(2016, 12, 25) and [START_DATE] <> #date(2017, 1, 1) and [START_DATE] <> #date(2017, 3, 18) and [START_DATE] <> #date(2017, 4, 1) and [START_DATE] <> #date(2017, 4, 19) and [START_DATE] <> #date(2017, 5, 18) and [START_DATE] <> #date(2017, 5, 20) and [START_DATE] <> #date(2017, 7, 1) and [START_DATE] <> #date(2017, 8, 1) and [START_DATE] <> #date(2017, 9, 2) and [START_DATE] <> #date(2017, 10, 7) and [START_DATE] <> #date(2017, 10, 31) and [START_DATE] <> #date(2017, 11, 18) and [START_DATE] <> #date(2017, 12, 5)))
 				in
 				    #"Filtered Rows"
 
