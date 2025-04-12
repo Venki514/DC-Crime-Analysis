@@ -1,4 +1,4 @@
-## Power Query M Code Explained (Detailed Walkthrough)
+# Power Query M Code Explained (Detailed Walkthrough)
 
 This section provides an in-depth explanation of the Power Query M code used to fetch, combine, and transform the DC Crime Incident data from the API source. It covers not just *what* each function does, but *why* it's used in this specific context and how the data flows through the process.
 
