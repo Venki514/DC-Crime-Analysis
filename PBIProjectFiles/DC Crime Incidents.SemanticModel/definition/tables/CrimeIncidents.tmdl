@@ -3,22 +3,22 @@ table CrimeIncidents
 
 	measure 'Total Incidents' = COUNTROWS('CrimeIncidents')
 		formatString: #,0
-		displayFolder: KPIs
+		displayFolder: Core Metrics
 		lineageTag: 61481093-104a-4d1c-ab94-87bfbe409a27
 
 	measure 'Avg Crimes per Day' = DIVIDE([Total Incidents], DISTINCTCOUNT('dimDate'[Date]))
-		displayFolder: KPIs
+		displayFolder: Core Metrics
 		lineageTag: 06f177dd-5e8c-478f-8bda-7623081f7caa
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
 	measure 'Crimes Today' = CALCULATE([Total Incidents], CrimeIncidents[START_DATE] = TODAY())
 		formatString: 0
-		displayFolder: KPIs
+		displayFolder: Core Metrics
 		lineageTag: 8561c033-b4f3-4bf8-a2d2-a6a71853f4d0
 
 	measure '7D Avg Crimes' = AVERAGEX(DATESINPERIOD('dimDate'[Date], MAX('dimDate'[Date]), -7, DAY), [Total Incidents])
-		displayFolder: KPIs
+		displayFolder: Core Metrics
 		lineageTag: afcdef2d-b4fb-4d5a-aca8-e33a75bd9f33
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
@@ -30,7 +30,7 @@ table CrimeIncidents
 			RETURN
 			    DIVIDE([Total Incidents] - Crimes_Last_Month, Crimes_Last_Month)
 			```
-		displayFolder: KPIs
+		displayFolder: Core Metrics
 		lineageTag: 76151667-75e8-4df0-9098-4e41a7a8d9ec
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
@@ -52,10 +52,521 @@ table CrimeIncidents
 			    DIVIDE([Total Incidents] - Crimes_Last_Week, Crimes_Last_Week)
 			
 			```
-		displayFolder: KPIs
+		displayFolder: Core Metrics
 		lineageTag: 536a1e0b-a2b2-437f-a37b-579d54a1f313
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Current Year Incidents' = ```
+			
+			CALCULATE([Total Incidents], 
+			    FILTER(ALL(dimDate), YEAR(dimDate[Date]) = YEAR(MAX(dimDate[Date]))))
+			```
+		formatString: 0
+		displayFolder: Core Metrics
+		lineageTag: 6bfadeef-4e71-48de-a211-10518e4cdd6f
+
+	measure 'Previous Year Incidents' = ```
+			
+			CALCULATE([Total Incidents], 
+			    FILTER(ALL(dimDate), YEAR(dimDate[Date]) = YEAR(MAX(dimDate[Date])) - 1))
+			```
+		formatString: 0
+		displayFolder: Core Metrics
+		lineageTag: 87399538-085d-4a4c-83dd-dc79dfd4c364
+
+	measure 'YoY Change' =
+			
+			VAR CurrentYearValue = [Current Year Incidents]
+			VAR PrevYearValue = [Previous Year Incidents]
+			RETURN
+			IF(PrevYearValue = 0, BLANK(), (CurrentYearValue - PrevYearValue) / PrevYearValue)
+		displayFolder: Core Metrics
+		lineageTag: f6be3a6b-e34f-455e-a22f-582e43cafb7a
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'YoY Change %' =
+			
+			FORMAT([YoY Change], "0.0%;-0.0%;0.0%")
+		displayFolder: Core Metrics
+		lineageTag: c42ed964-c856-489a-b4f4-09fc00afb36e
+
+	measure 'MTD Incidents' =
+			
+			CALCULATE([Total Incidents], DATESMTD(dimDate[Date]))
+		formatString: 0
+		displayFolder: Core Metrics
+		lineageTag: 43803a6a-1bdb-49ca-a19e-d2b0e4e52db0
+
+	measure 'QTD Incidents' =
+			
+			CALCULATE([Total Incidents], DATESQTD(dimDate[Date]))
+		formatString: 0
+		displayFolder: Core Metrics
+		lineageTag: c475f04d-b764-4e5e-a9d1-62119f659948
+
+	measure 'YTD Incidents' =
+			
+			CALCULATE([Total Incidents], DATESYTD(dimDate[Date]))
+		formatString: 0
+		displayFolder: Core Metrics
+		lineageTag: f63f296d-dcdb-4ed4-9c31-e23a512c6202
+
+	measure 'Last 30 Days Incidents' = ```
+			
+			CALCULATE([Total Incidents], 
+			    DATESINPERIOD(dimDate[Date], MAX(dimDate[Date]), -30, DAY))
+			```
+		formatString: 0
+		displayFolder: Core Metrics
+		lineageTag: a513e691-92cc-48b0-885e-bbac627b441e
+
+	measure 'Last 90 Days Incidents' = ```
+			
+			CALCULATE([Total Incidents], 
+			    DATESINPERIOD(dimDate[Date], MAX(dimDate[Date]), -90, DAY))
+			```
+		formatString: 0
+		displayFolder: Core Metrics
+		lineageTag: 82a98604-a82d-4717-84f9-acb4e2eada89
+
+	measure 'Day Incidents' = ```
+			
+			CALCULATE([Total Incidents], 
+			    FILTER(ALL(dimTime), dimTime[Time Category] = "Day (6-17)"))
+			```
+		formatString: 0
+		displayFolder: Temporal Intelligence Measures
+		lineageTag: 01d75f92-348e-4a0b-82ed-5e8ecf54aba8
+
+	measure 'Night Incidents' = ```
+			
+			CALCULATE([Total Incidents], 
+			    FILTER(ALL(dimTime), dimTime[Time Category] = "Night (21-5)"))
+			```
+		formatString: 0
+		displayFolder: Temporal Intelligence Measures
+		lineageTag: eb845411-4e8d-48cf-8d3f-bd18d7f32842
+
+	measure 'Day to Night Ratio' =
+			
+			DIVIDE([Day Incidents], [Night Incidents], 0)
+		displayFolder: Temporal Intelligence Measures
+		lineageTag: 1d502c3b-d762-4645-80f7-782b456cf40c
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Incidents by Hour' = ```
+			
+			CALCULATE([Total Incidents], 
+			    ALLEXCEPT(dimTime, dimTime[Hour]))
+			```
+		formatString: 0
+		displayFolder: Temporal Intelligence Measures
+		lineageTag: 77369d78-3188-4148-90bf-3125580f8a2d
+
+	measure 'Peak Hour' =
+			
+			VAR MaxCount = MAXX(ALL(dimTime[Hour]), [Incidents by Hour])
+			RETURN
+			MAXX(
+			    FILTER(ALL(dimTime[Hour]), [Incidents by Hour] = MaxCount),
+			    dimTime[Hour]
+			)
+		formatString: 0
+		displayFolder: Temporal Intelligence Measures
+		lineageTag: 0655c9c8-16af-4ff1-90b3-4f5f65f1eb8f
+
+	measure 'Weekend Incidents' = ```
+			
+			CALCULATE([Total Incidents], 
+			    FILTER(ALL(dimDate), dimDate[Is Weekend] = TRUE))
+			```
+		formatString: 0
+		displayFolder: Temporal Intelligence Measures
+		lineageTag: d64a773a-5eb7-4a28-aa67-0cf4e61d88bf
+
+	measure 'Weekday Incidents' = ```
+			
+			CALCULATE([Total Incidents], 
+			    FILTER(ALL(dimDate), dimDate[Is Weekend] = FALSE))
+			```
+		formatString: 0
+		displayFolder: Temporal Intelligence Measures
+		lineageTag: 66a9a0d5-4c08-479f-b86b-2c7e8155d33f
+
+	measure 'Weekend Concentration' =
+			
+			DIVIDE([Weekend Incidents], [Total Incidents], 0)
+		displayFolder: Temporal Intelligence Measures
+		lineageTag: cb347c90-eef9-49d0-bd61-d35e06cdce73
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Monthly Seasonality Index' =
+			
+			VAR CurrentMonthIncidents = CALCULATE([Total Incidents], DATESMTD(dimDate[Date]))
+			VAR AvgMonthlyIncidents = DIVIDE([YTD Incidents], MONTH(MAX(dimDate[Date])), 0)
+			RETURN
+			IF(AvgMonthlyIncidents = 0, BLANK(), CurrentMonthIncidents / AvgMonthlyIncidents)
+		displayFolder: Temporal Intelligence Measures
+		lineageTag: 8f49e48c-5277-4b18-8ebf-78c1dc569d01
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Incidents by Ward' = ```
+			
+			CALCULATE([Total Incidents], 
+			    ALLEXCEPT(CrimeIncidents, CrimeIncidents[WARD]))
+			```
+		formatString: 0
+		displayFolder: Geographic Analysis Measures
+		lineageTag: fcc43c3a-ee91-4088-a245-3e678eb16f9a
+
+	measure 'Incidents by District' = ```
+			
+			CALCULATE([Total Incidents], 
+			    ALLEXCEPT(CrimeIncidents, CrimeIncidents[DISTRICT]))
+			```
+		formatString: 0
+		displayFolder: Geographic Analysis Measures
+		lineageTag: 05dc25a5-14d1-425b-b474-a46cc0dab8fc
+
+	measure 'Incidents by PSA' = ```
+			
+			CALCULATE([Total Incidents], 
+			    ALLEXCEPT(CrimeIncidents, CrimeIncidents[PSA]))
+			```
+		formatString: 0
+		displayFolder: Geographic Analysis Measures
+		lineageTag: 4bc836bc-373b-4bdd-a455-3a36675ede2e
+
+	measure 'Incidents by Neighborhood' = ```
+			
+			CALCULATE([Total Incidents], 
+			    ALLEXCEPT(CrimeIncidents, CrimeIncidents[NEIGHBORHOOD_CLUSTER]))
+			```
+		formatString: 0
+		displayFolder: Geographic Analysis Measures
+		lineageTag: 53faf779-1218-4188-993c-1ec289ca4d6d
+
+	measure 'Geographic Concentration' = ```
+			
+			VAR TopWardIncidents = 
+			    MAXX(ALL(CrimeIncidents[WARD]), [Incidents by Ward])
+			RETURN
+			DIVIDE(TopWardIncidents, [Total Incidents], 0)
+			```
+		displayFolder: Geographic Analysis Measures
+		lineageTag: 3a92f60f-c51d-41d7-8a8e-d5a4fc170a16
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Location Density' =
+			
+			COUNTROWS(CrimeIncidents) / DISTINCTCOUNT(CrimeIncidents[BLOCK])
+		displayFolder: Geographic Analysis Measures
+		lineageTag: a583071d-e502-4ffe-bd3e-ccdec282cc0d
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Incidents by Offense' = ```
+			
+			CALCULATE([Total Incidents], 
+			    ALLEXCEPT(CrimeIncidents, CrimeIncidents[OFFENSE]))
+			```
+		formatString: 0
+		displayFolder: Crime Type Analysis Measures
+		lineageTag: 72989301-0829-4654-aa10-970af926f7e2
+
+	measure 'Most Common Offense' =
+			
+			VAR MaxCount = MAXX(ALL(CrimeIncidents[OFFENSE]), [Incidents by Offense])
+			RETURN
+			MAXX(
+			    FILTER(ALL(CrimeIncidents[OFFENSE]), [Incidents by Offense] = MaxCount),
+			    CrimeIncidents[OFFENSE]
+			)
+		displayFolder: Crime Type Analysis Measures
+		lineageTag: 71b4ab06-b957-4c16-8d23-323686196436
+
+	measure 'Incidents by Method' = ```
+			
+			CALCULATE([Total Incidents], 
+			    ALLEXCEPT(CrimeIncidents, CrimeIncidents[METHOD]))
+			```
+		formatString: 0
+		displayFolder: Crime Type Analysis Measures
+		lineageTag: 365a9620-379e-4739-bc5d-3e42b23458ab
+
+	measure 'Method Offense Correlation' = ```
+			
+			VAR OffenseCount = [Incidents by Offense]
+			VAR MethodCount = [Incidents by Method]
+			VAR JointCount = CALCULATE([Total Incidents], 
+			    ALLEXCEPT(CrimeIncidents, CrimeIncidents[METHOD], CrimeIncidents[OFFENSE]))
+			VAR TotalCount = [Total Incidents]
+			RETURN
+			DIVIDE(JointCount * TotalCount, OffenseCount * MethodCount, 0)
+			```
+		displayFolder: Crime Type Analysis Measures
+		lineageTag: 4a3714bf-2def-4928-9569-f076fb5d898f
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure '30-Day Moving Average' =
+			
+			AVERAGEX(
+			    DATESINPERIOD(dimDate[Date], MAX(dimDate[Date]), -30, DAY),
+			    CALCULATE([Total Incidents], ALLEXCEPT(dimDate, dimDate[Date]))
+			)
+		displayFolder: Advanced Statistical Measures
+		lineageTag: c4cae728-b2e9-4f9b-b435-cd78eba7eda7
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Incident Std Dev' =
+			
+			STDEVX.P(
+			    DATESINPERIOD(dimDate[Date], MAX(dimDate[Date]), -90, DAY),
+			    CALCULATE([Total Incidents], ALLEXCEPT(dimDate, dimDate[Date]))
+			)
+		displayFolder: Advanced Statistical Measures
+		lineageTag: cab5fe73-e0fd-48bf-8e1e-1c8d066386f7
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Daily Z-Score' =
+			
+			VAR DailyIncidents = CALCULATE([Total Incidents], ALLEXCEPT(dimDate, dimDate[Date]))
+			VAR AvgIncidents = [30-Day Moving Average]
+			VAR _StdDev = [Incident Std Dev]
+			RETURN
+			IF(_StdDev = 0, BLANK(), (DailyIncidents - AvgIncidents) / _StdDev)
+		displayFolder: Advanced Statistical Measures
+		lineageTag: 0abab0c5-25ab-4414-9e20-68af99ce8374
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Is Anomaly' =
+			
+			IF(ABS([Daily Z-Score]) > 2, TRUE(), FALSE())
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		displayFolder: Advanced Statistical Measures
+		lineageTag: 0aebe343-0e5b-4a2b-8ac2-76c4379acb46
+
+	measure 'Hour Pattern Similarity' = ```
+			
+			VAR CurrentPattern = [Incidents by Hour]
+			VAR PreviousDayPattern = CALCULATE([Incidents by Hour], 
+			    DATEADD(dimDate[Date], -1, DAY))
+			VAR Sum1 = SUMX(ALL(dimTime[Hour]), CurrentPattern)
+			VAR Sum2 = SUMX(ALL(dimTime[Hour]), PreviousDayPattern)
+			VAR SumProduct = SUMX(ALL(dimTime[Hour]), CurrentPattern * PreviousDayPattern)
+			VAR SqSum1 = SUMX(ALL(dimTime[Hour]), POWER(CurrentPattern, 2))
+			VAR SqSum2 = SUMX(ALL(dimTime[Hour]), POWER(PreviousDayPattern, 2))
+			RETURN
+			DIVIDE(
+			    SumProduct,
+			    SQRT(SqSum1 * SqSum2),
+			    0
+			)
+			```
+		displayFolder: Time Pattern Recognition Measures
+		lineageTag: 60009ecb-dd08-42c8-9688-406d08db59fb
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Day of Week Index' =
+			
+			VAR CurrentDOW = SELECTEDVALUE(dimDate[Day of Week])
+			VAR AvgThisDOW = AVERAGEX(
+			    FILTER(ALL(dimDate), dimDate[Day of Week] = CurrentDOW),
+			    CALCULATE([Total Incidents], ALLEXCEPT(dimDate, dimDate[Date]))
+			)
+			VAR AvgAllDays = AVERAGEX(
+			    ALL(dimDate),
+			    CALCULATE([Total Incidents], ALLEXCEPT(dimDate, dimDate[Date]))
+			)
+			RETURN
+			DIVIDE(AvgThisDOW, AvgAllDays, 1)
+		displayFolder: Time Pattern Recognition Measures
+		lineageTag: 5662ce76-c74d-4e3a-8f0a-d3ab17065bf3
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Daily Trend' = ```
+			
+			VAR X = DATEDIFF(MIN(dimDate[Date]), SELECTEDVALUE(dimDate[Date]), DAY)
+			VAR AvgX = AVERAGEX(ALL(dimDate), DATEDIFF(MIN(dimDate[Date]), dimDate[Date], DAY))
+			VAR AvgY = AVERAGEX(ALL(dimDate), CALCULATE([Total Incidents], ALLEXCEPT(dimDate, dimDate[Date])))
+			VAR SumDiffSquaredX = SUMX(ALL(dimDate), POWER(DATEDIFF(MIN(dimDate[Date]), dimDate[Date], DAY) - AvgX, 2))
+			VAR SumDiffProduct = SUMX(ALL(dimDate), 
+			    (DATEDIFF(MIN(dimDate[Date]), dimDate[Date], DAY) - AvgX) * 
+			    (CALCULATE([Total Incidents], ALLEXCEPT(dimDate, dimDate[Date])) - AvgY)
+			)
+			VAR Slope = DIVIDE(SumDiffProduct, SumDiffSquaredX, 0)
+			VAR Intercept = AvgY - Slope * AvgX
+			RETURN
+			Intercept + Slope * X
+			```
+		displayFolder: Predictive Measures
+		lineageTag: e78ddc7d-5d89-4013-9fc9-009ae49eb314
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure '7-Day Forecast' = ```
+			
+			VAR MaxDate = MAX(dimDate[Date])
+			VAR DayNum = DATEDIFF(MIN(dimDate[Date]), MaxDate, DAY)
+			VAR X = DayNum + 7
+			VAR AvgX = AVERAGEX(ALL(dimDate), DATEDIFF(MIN(dimDate[Date]), dimDate[Date], DAY))
+			VAR AvgY = AVERAGEX(ALL(dimDate), CALCULATE([Total Incidents], ALLEXCEPT(dimDate, dimDate[Date])))
+			VAR SumDiffSquaredX = SUMX(ALL(dimDate), POWER(DATEDIFF(MIN(dimDate[Date]), dimDate[Date], DAY) - AvgX, 2))
+			VAR SumDiffProduct = SUMX(ALL(dimDate), 
+			    (DATEDIFF(MIN(dimDate[Date]), dimDate[Date], DAY) - AvgX) * 
+			    (CALCULATE([Total Incidents], ALLEXCEPT(dimDate, dimDate[Date])) - AvgY)
+			)
+			VAR Slope = DIVIDE(SumDiffProduct, SumDiffSquaredX, 0)
+			VAR Intercept = AvgY - Slope * AvgX
+			RETURN
+			Intercept + Slope * X
+			```
+		displayFolder: Predictive Measures
+		lineageTag: fa036752-45e7-4a7b-8ae1-b4b1900cd851
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Crime Severity Weight' =
+			
+			SWITCH(
+			    SELECTEDVALUE(CrimeIncidents[OFFENSE]),
+			    "HOMICIDE", 100,
+			    "ROBBERY", 60,
+			    "BURGLARY", 40,
+			    "THEFT/OTHER", 20,
+			    "THEFT F/AUTO", 15,
+			    10 // default weight
+			)
+		formatString: 0
+		displayFolder: Crime Severity and Impact Measures
+		lineageTag: 3f63cc53-e792-4ec6-84bb-48051573a1e6
+
+	measure 'Weighted Crime Index' =
+			
+			SUMX(
+			    CrimeIncidents,
+			    CALCULATE([Crime Severity Weight])
+			)
+		formatString: 0
+		displayFolder: Crime Severity and Impact Measures
+		lineageTag: 3e6df8d8-2122-4def-9122-d3976af1ece5
+
+	measure 'Average Response Time' =
+			
+			AVERAGEX(
+			    CrimeIncidents,
+			    DATEDIFF(CrimeIncidents[REPORT_DATE], CrimeIncidents[START_DATE], MINUTE)
+			)
+		displayFolder: Crime Severity and Impact Measures
+		lineageTag: 8385d102-9657-4800-8a45-f8d0893eb82a
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Cases Cleared' = ```
+			// Placeholder for actual cleared cases data
+			COUNTROWS(CrimeIncidents) * 0.4 // Example only - replace with actual measure
+			
+			```
+		displayFolder: Crime Severity and Impact Measures
+		lineageTag: 211c9220-9a92-47d9-9919-7ea047e20e27
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Clearance Rate' =
+			
+			DIVIDE([Cases Cleared], [Total Incidents], 0)
+		displayFolder: Crime Severity and Impact Measures
+		lineageTag: 70f2a503-0084-4f3b-8910-288cff9f90e2
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'SMLY Incidents' =
+			
+			CALCULATE([Total Incidents],
+			    SAMEPERIODLASTYEAR(dimDate[Date]))
+		formatString: 0
+		displayFolder: Comparative Analysis Measures
+		lineageTag: 9a87b423-1581-4e97-bfaf-394e2ddbc9aa
+
+	measure 'MoM Change' = ```
+			
+			VAR CurrentMonth = CALCULATE([Total Incidents], DATESMTD(dimDate[Date]))
+			VAR PrevMonth = CALCULATE([Total Incidents], 
+			    DATEADD(DATESMTD(dimDate[Date]), -1, MONTH))
+			RETURN
+			DIVIDE(CurrentMonth - PrevMonth, PrevMonth, 0)
+			```
+		displayFolder: Comparative Analysis Measures
+		lineageTag: f4e621fb-6335-4e02-b7c6-e48711fb7abe
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Ward Benchmark' = ```
+			
+			VAR CurrentWard = SELECTEDVALUE(CrimeIncidents[WARD])
+			VAR AvgOtherWards = 
+			    CALCULATE(
+			        DIVIDE([Total Incidents], DISTINCTCOUNT(CrimeIncidents[WARD])),
+			        ALL(CrimeIncidents[WARD])
+			    )
+			VAR CurrentWardRate = 
+			    CALCULATE([Total Incidents], CrimeIncidents[WARD] = CurrentWard)
+			RETURN
+			DIVIDE(CurrentWardRate, AvgOtherWards, 0)
+			```
+		displayFolder: Comparative Analysis Measures
+		lineageTag: 3ecae8b4-3779-4605-92d4-3b285bbc7675
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Primary Insight' = ```
+			
+			VAR TopOffense = [Most Common Offense]
+			VAR TopWard = 
+			    MAXX(
+			        TOPN(1, ALL(CrimeIncidents[WARD]), [Incidents by Ward], DESC),
+			        CrimeIncidents[WARD]
+			    )
+			VAR YoYChangeVal = [YoY Change]
+			VAR TrendDirection = 
+			    IF([YoY Change] > 0, "increased", "decreased")
+			RETURN
+			"The most common offense is " & TopOffense & 
+			" with the highest concentration in Ward " & TopWard & 
+			". Overall incidents have " & TrendDirection & 
+			" by " & FORMAT(ABS(YoYChangeVal), "0.0%") & 
+			" compared to the same period last year."
+			```
+		displayFolder: AI-Enhanced Narrative Measures
+		lineageTag: f0d6f4bd-0b2a-45ba-a613-62b343fed6f2
+
+	measure 'Time Pattern Insight' = ```
+			
+			VAR PeakHourVal = [Peak Hour]
+			VAR WeekendConcentrationVal = [Weekend Concentration]
+			VAR WeekendEmphasis = 
+			    IF(WeekendConcentrationVal > 0.3, 
+			       " with significant weekend concentration", 
+			       " with incidents distributed throughout the week")
+			RETURN
+			"Peak activity occurs around " & 
+			FORMAT(PeakHourVal, "00") & ":00" & 
+			WeekendEmphasis & "."
+			```
+		displayFolder: AI-Enhanced Narrative Measures
+		lineageTag: de594381-24f5-469e-80b9-2ffa99b91263
 
 	column CCN
 		dataType: int64
