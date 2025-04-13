@@ -10,11 +10,10 @@
       "nodes": [
         {
           "location": {
-            "x": 334.1847511806298,
-            "y": -50
+            "x": 852.36163941535983,
+            "y": 25
           },
           "nodeIndex": "CrimeIncidents",
-          "nodeLineageTag": "547917d3-3be2-4a34-9861-c9674d856ef5",
           "size": {
             "height": 300,
             "width": 234
@@ -24,7 +23,7 @@
         {
           "location": {
             "x": 618.36163941535983,
-            "y": -36.675007367565115
+            "y": -18.337503683782558
           },
           "nodeIndex": "dimDate",
           "nodeLineageTag": "410c4d27-b429-4d5a-8b9b-1211d9564cd6",
@@ -37,7 +36,7 @@
         {
           "location": {
             "x": 50,
-            "y": -42.934890822658005
+            "y": -24.597387138875447
           },
           "nodeIndex": "dimTime",
           "nodeLineageTag": "1e98c5b4-a385-4f33-be4d-142dfa7c5cb1",

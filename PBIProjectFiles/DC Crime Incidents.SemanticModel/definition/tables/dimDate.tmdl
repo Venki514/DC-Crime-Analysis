@@ -1,8 +1,10 @@
 table dimDate
 	lineageTag: 410c4d27-b429-4d5a-8b9b-1211d9564cd6
+	dataCategory: Time
 
 	column Date
 		dataType: dateTime
+		isKey
 		formatString: Long Date
 		lineageTag: 4c24d7ec-2d67-44c9-a933-44523855ad4a
 		summarizeBy: none
@@ -148,7 +150,7 @@ table dimDate
 		summarizeBy: none
 		sourceColumn: DateKey
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Month Short'
 		dataType: string
@@ -173,15 +175,15 @@ table dimDate
 		summarizeBy: none
 		sourceColumn: Day of Year
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition dimDate = m
 		mode: import
 		source = ```
 				let
 				    // Get min/max dates from existing crime data
-				    StartDate = DateTime.Date(List.Min(CrimeIncidents[START_DATE])),
-				    EndDate = DateTime.Date(List.Max(CrimeIncidents[START_DATE])),
+				    StartDate = DateTime.Date(List.Min(CrimeIncidents[START_DATE_ONLY])),
+				    EndDate = DateTime.Date(List.Max(CrimeIncidents[REPORT_DATE])),
 				
 				    // Create continuous date sequence
 				    DateList = List.Dates(StartDate, Duration.Days(EndDate - StartDate) + 1, #duration(1,0,0,0)),
